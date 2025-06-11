@@ -178,19 +178,33 @@ export default function CreditReportPage() {
         <div className="text-center">
           <div className="relative">
             {/* Main spinner */}
-            <div className="w-16 h-16 mx-auto relative">
-              <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-              {/* Cloudy in center */}
-              <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-32 h-32 mx-auto relative">
+              {/* Rainbow background ring */}
+              <div className="w-32 h-32 rounded-full animate-spin relative" style={{
+                background: 'conic-gradient(from 0deg, #ef4444, #f97316, #eab308, #22c55e, #06b6d4, #3b82f6, #8b5cf6, #ef4444)',
+                padding: '4px'
+              }}>
+                <div className="w-full h-full bg-gradient-to-br from-blue-50 to-purple-50 rounded-full"></div>
+              </div>
+              
+              {/* Moving accent with dynamic thickness */}
+              <div className="absolute inset-0 w-32 h-32 border-transparent rounded-full animate-spin" style={{
+                borderTopColor: '#3b82f6',
+                animation: 'spin 1s linear infinite, rainbow-cycle 1.5s linear infinite, thickness-pulse 2s ease-in-out infinite'
+              }}></div>
+              
+              {/* Cloudy mascot positioned up */}
+              <div className="absolute inset-0 flex items-center justify-center" style={{transform: 'translateY(-2px)'}}>
                 <img 
                   src={cloudyMascot} 
                   alt="Cloudy" 
-                  className="w-8 h-8 object-contain"
+                  className="w-20 h-20 object-contain"
                 />
               </div>
             </div>
+            
             {/* Pulse effect */}
-            <div className="absolute inset-0 w-16 h-16 mx-auto border-4 border-purple-200 rounded-full animate-pulse opacity-40"></div>
+            <div className="absolute inset-0 w-32 h-32 mx-auto border-4 border-blue-200 rounded-full animate-pulse opacity-40"></div>
           </div>
         </div>
       </div>
@@ -1443,7 +1457,7 @@ export default function CreditReportPage() {
                               <h3 className="font-semibold text-gray-900">
                                 {totalNegativeCount} Negative Account{totalNegativeCount === 1 ? '' : 's'}
                               </h3>
-                              <p className="text-sm text-red-600 font-medium">Action Required - <span className="text-sm md:text-xs text-gray-600">Complete steps 1-2-3 for each negative account below</span></p>
+                              <p className="text-sm text-red-600 font-medium">Action Required: <span className="text-sm md:text-xs text-gray-600">Complete steps 1-2-3 for each negative account below</span></p>
                             </div>
                           </div>
                           <button
