@@ -1328,10 +1328,10 @@ Due to these reporting inaccuracies and regulatory violations, I am requesting t
               <div className="flex items-center justify-between mb-3">
               <h4 className="font-semibold text-black">{getCreditorName()}</h4>
               <Select value={transUnionStatus || (accountIsNegative ? "Negative" : "Positive")} onValueChange={setTransUnionStatus}>
-                <SelectTrigger className={`w-24 h-7 text-xs [&>svg]:w-3 [&>svg]:h-3 [&>svg]:opacity-100 [&>svg]:shrink-0 ${
+                <SelectTrigger className={`w-24 h-7 text-xs transform translate-x-[10px] [&>svg]:w-3 [&>svg]:h-3 [&>svg]:opacity-100 [&>svg]:shrink-0 border-0 bg-transparent shadow-none hover:bg-gray-50 ${
                   (transUnionStatus || (accountIsNegative ? "Negative" : "Positive")) === "Negative" 
-                    ? "border-red-600 bg-red-600 text-white [&>svg]:text-white [&>svg]:stroke-white [&>svg]:fill-transparent pl-2 pr-1" 
-                    : "border-green-400 bg-green-100 text-green-700 [&>svg]:text-green-600 [&>svg]:ml-1"
+                    ? "text-gray-700 [&>svg]:text-gray-700" 
+                    : "text-green-700 [&>svg]:text-green-600"
                 }`}>
                   <div className="flex items-center gap-1">
                     {(transUnionStatus || (accountIsNegative ? "Negative" : "Positive")) === "Negative" && (
@@ -1473,10 +1473,10 @@ Due to these reporting inaccuracies and regulatory violations, I am requesting t
             <div className="flex items-center justify-between mb-3">
               <h4 className="font-semibold text-black">{getCreditorName()}</h4>
               <Select value={equifaxStatus || (accountIsNegative ? "Negative" : "Positive")} onValueChange={setEquifaxStatus}>
-                <SelectTrigger className={`w-24 h-7 text-xs [&>svg]:w-3 [&>svg]:h-3 [&>svg]:opacity-100 [&>svg]:shrink-0 ${
+                <SelectTrigger className={`w-24 h-7 text-xs transform translate-x-[10px] [&>svg]:w-3 [&>svg]:h-3 [&>svg]:opacity-100 [&>svg]:shrink-0 border-0 bg-transparent shadow-none hover:bg-gray-50 ${
                   (equifaxStatus || (accountIsNegative ? "Negative" : "Positive")) === "Negative" 
-                    ? "border-red-600 bg-red-600 text-white [&>svg]:text-white [&>svg]:stroke-white [&>svg]:fill-transparent pl-2 pr-1" 
-                    : "border-green-400 bg-green-100 text-green-700 [&>svg]:text-green-600 [&>svg]:ml-1"
+                    ? "text-gray-700 [&>svg]:text-gray-700" 
+                    : "text-green-700 [&>svg]:text-green-600"
                 }`}>
                   <div className="flex items-center gap-1">
                     {(equifaxStatus || (accountIsNegative ? "Negative" : "Positive")) === "Negative" && (
@@ -1618,10 +1618,10 @@ Due to these reporting inaccuracies and regulatory violations, I am requesting t
             <div className="flex items-center justify-between mb-3">
               <h4 className="font-semibold text-black">{getCreditorName()}</h4>
               <Select value={experianStatus || (accountIsNegative ? "Negative" : "Positive")} onValueChange={setExperianStatus}>
-                <SelectTrigger className={`w-24 h-7 text-xs [&>svg]:w-3 [&>svg]:h-3 [&>svg]:opacity-100 [&>svg]:shrink-0 ${
+                <SelectTrigger className={`w-24 h-7 text-xs transform translate-x-[10px] [&>svg]:w-3 [&>svg]:h-3 [&>svg]:opacity-100 [&>svg]:shrink-0 border-0 bg-transparent shadow-none hover:bg-gray-50 ${
                   (experianStatus || (accountIsNegative ? "Negative" : "Positive")) === "Negative" 
-                    ? "border-red-600 bg-red-600 text-white [&>svg]:text-white [&>svg]:stroke-white [&>svg]:fill-transparent pl-2 pr-1" 
-                    : "border-green-400 bg-green-100 text-green-700 [&>svg]:text-green-600 [&>svg]:ml-1"
+                    ? "text-gray-700 [&>svg]:text-gray-700" 
+                    : "text-green-700 [&>svg]:text-green-600"
                 }`}>
                   <div className="flex items-center gap-1">
                     {(experianStatus || (accountIsNegative ? "Negative" : "Positive")) === "Negative" && (
@@ -2262,7 +2262,10 @@ Due to these reporting inaccuracies and regulatory violations, I am requesting t
                 {(!(selectedReason || customReason.trim())) || (!(selectedInstruction || customInstruction.trim())) ? (
                   <div className="flex items-center bg-red-50 border border-red-300 rounded-md px-3 py-1 md:gap-2 md:justify-start justify-center">
                     <AlertTriangle className="hidden md:block w-4 h-4 text-red-600" />
-                    <span className="text-xs md:text-sm text-red-600">Complete Reason & Instructions</span>
+                    <span className="text-xs md:text-sm text-red-600">
+                      <span className="md:hidden">Complete Step 2</span>
+                      <span className="hidden md:inline">Complete Reason & Instruction</span>
+                    </span>
                   </div>
                 ) : <div></div>}
                 <div className="flex items-center gap-2 relative overflow-visible">
