@@ -104,6 +104,28 @@ This is a sophisticated AI-powered credit repair dashboard built with React and 
 
 ## Changelog
 
+- June 14, 2025: Created unified red-outlined negative accounts section with connected header design
+  - White header box with red outline on top and sides only (no bottom border)
+  - First pink account card has square top corners connecting seamlessly with header
+  - Subsequent pink accounts maintain full rounded corner styling
+  - Eliminated visual gap between header information and first account card
+  - Creates cohesive, connected appearance for entire negative accounts section
+- June 14, 2025: Fixed white screen delay before Cloudy loader appears
+  - Added matching gradient background to body element in index.html
+  - Eliminated jarring white screen during initial page load
+  - Provides seamless blue-to-purple gradient transition from page start to Cloudy animation
+  - Improved overall user experience with immediate visual feedback
+- June 13, 2025: Simplified green completion box text and fixed section collapse choreography
+  - Removed "Inquiry", "Account", and "Public record" words from bold text in green completion boxes
+  - Now shows cleaner text: "X disputes saved", "X Disputes Completed", etc.
+- June 13, 2025: Fixed section collapse choreography for both Hard Inquiries and Credit Accounts
+  - Fixed "Select All Score-Impact Items" button to auto-scroll to dispute section after selection (both direct and through warning dialog)
+  - Fixed Hard Inquiries section to collapse visibly at top of screen instead of off-screen
+  - Fixed Credit Accounts section to collapse visibly at top of screen instead of off-screen
+  - Enhanced choreography for both sections: Save → Green → 1 second wait → Scroll to top → Visible collapse → Scroll to next section 20px above
+  - Removed internal collapse mechanism completely from modern-inquiries.tsx component
+  - Both sections now provide clean, visible collapse experience matching Public Records pattern
+  - Auto-scroll works in both scenarios: direct selection and proceeding through warnings
 - June 13, 2025: Enhanced public records UI and completed dispute data restoration functionality
   - Replaced informational text with up arrow when all public records are saved but expanded (both desktop and mobile)
   - Added useful dispute reason display for individually saved public records (shows "Dispute: [reason]" instead of generic "Dispute Saved")
