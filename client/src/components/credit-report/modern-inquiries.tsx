@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -8,9 +8,20 @@ import { Search, Calendar, Building, CheckCircle, FileText, AlertCircle, CheckCi
 
 interface ModernInquiriesProps {
   creditData: any;
+  onDisputeSaved?: (disputeData?: {
+    reason: string;
+    instruction: string;
+    selectedItems: {[key: string]: boolean};
+  }) => void;
+  initialDisputeData?: {
+    reason: string;
+    instruction: string;
+    selectedItems: {[key: string]: boolean};
+  } | null;
+  forceExpanded?: boolean;
 }
 
-export function ModernInquiries({ creditData }: ModernInquiriesProps) {
+export function ModernInquiries({ creditData, onDisputeSaved, initialDisputeData, forceExpanded }: ModernInquiriesProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -30,23 +41,65 @@ export function ModernInquiries({ creditData }: ModernInquiriesProps) {
       });
     },
   });
-  const [selectedItems, setSelectedItems] = useState<{[key: string]: boolean}>({});
+  const [selectedItems, setSelectedItems] = useState<{[key: string]: boolean}>(
+    initialDisputeData?.selectedItems || {}
+  );
   const [showCustomReasonField, setShowCustomReasonField] = useState(false);
   const [showCustomInstructionField, setShowCustomInstructionField] = useState(false);
-  const [selectedReason, setSelectedReason] = useState<string>("");
-  const [selectedInstruction, setSelectedInstruction] = useState<string>("");
+  const [selectedReason, setSelectedReason] = useState<string>(
+    initialDisputeData?.reason || ""
+  );
+  const [selectedInstruction, setSelectedInstruction] = useState<string>(
+    initialDisputeData?.instruction || ""
+  );
+  
+  // Fix truncated instruction on component mount
+  useEffect(() => {
+    console.log('COMPONENT INIT DEBUG - initialDisputeData:', initialDisputeData);
+    console.log('COMPONENT INIT DEBUG - instruction from prop:', initialDisputeData?.instruction);
+    console.log('COMPONENT INIT DEBUG - instruction length:', initialDisputeData?.instruction?.length);
+    
+    // If instruction appears truncated (shorter than expected), restore the full text
+    if (initialDisputeData?.instruction && initialDisputeData.instruction.length < 30) {
+      console.log('FIXING TRUNCATED INSTRUCTION - restoring full text');
+      const fullInstruction = "Please remove this unauthorized inquiry from my credit report";
+      setSelectedInstruction(fullInstruction);
+    }
+  }, [initialDisputeData]);
   const [customReason, setCustomReason] = useState<string>("");
   const [customInstruction, setCustomInstruction] = useState<string>("");
-  const [isDisputeSaved, setIsDisputeSaved] = useState<boolean>(false);
+  const [isDisputeSaved, setIsDisputeSaved] = useState<boolean>(!!initialDisputeData);
   const [isTypingReason, setIsTypingReason] = useState(false);
   const [isTypingInstruction, setIsTypingInstruction] = useState(false);
   const [warningDialogs, setWarningDialogs] = useState<{[key: string]: boolean}>({});
   const [acknowledgedWarnings, setAcknowledgedWarnings] = useState<{[key: string]: boolean}>({});
   const [bulkWarningDialog, setBulkWarningDialog] = useState<{isOpen: boolean, items: any[]}>({isOpen: false, items: []});
   const [showGuideArrow, setShowGuideArrow] = useState(false);
-  const [showInquiryDetails, setShowInquiryDetails] = useState(false);
-  const [showOlderInquiries, setShowOlderInquiries] = useState(false);
-  const [showRecentInquiries, setShowRecentInquiries] = useState(false);
+  const [showInquiryDetails, setShowInquiryDetails] = useState(!!initialDisputeData);
+  // Helper function to check if a section has selected inquiries
+  const shouldExpandSection = (sectionType: 'recent' | 'older') => {
+    if (!initialDisputeData?.selectedItems) return false;
+    
+    const selectedItems = initialDisputeData.selectedItems as { [key: string]: boolean };
+    const selectedKeys = Object.keys(selectedItems).filter(key => selectedItems[key]);
+    
+    if (sectionType === 'recent') {
+      // Recent inquiries are the individual bureau inquiries (equifax-inquiry-X, experian-inquiry-X, transunion-inquiry-X)
+      return selectedKeys.some(key => 
+        key.includes('equifax-inquiry') || 
+        key.includes('experian-inquiry') || 
+        key.includes('transunion-inquiry') ||
+        key.includes('recent-inquiry')
+      );
+    } else {
+      // Older inquiries would have different naming pattern (older-inquiry-X)
+      return selectedKeys.some(key => key.includes('older-inquiry'));
+    }
+  };
+
+  const [showOlderInquiries, setShowOlderInquiries] = useState(shouldExpandSection('older'));
+  const [showRecentInquiries, setShowRecentInquiries] = useState(shouldExpandSection('recent'));
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Check if form is complete and show guide arrow
   const checkFormCompletionAndShowArrow = (currentSelectedItems = selectedItems) => {
@@ -256,6 +309,30 @@ export function ModernInquiries({ creditData }: ModernInquiriesProps) {
       });
       setSelectedItems(newSelections);
       
+      // Auto-scroll to dispute section after proceeding through warning
+      setTimeout(() => {
+        console.log("Auto-scrolling after proceeding through warning");
+        const disputeSection = document.querySelector('[data-section="inquiries"] .pt-3') || 
+                             document.querySelector('[data-section="inquiries"]');
+        if (disputeSection) {
+          console.log("Found dispute section, scrolling");
+          disputeSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else {
+          console.log("Could not find dispute section for scroll");
+        }
+      }, 200);
+      
+      // Add red glow effect to the Hard Inquiries card after proceeding
+      setTimeout(() => {
+        const inquiriesCard = document.querySelector('[data-section="hard-inquiries"] .border');
+        if (inquiriesCard) {
+          inquiriesCard.classList.add('ring-4', 'ring-red-400', 'ring-opacity-75');
+          setTimeout(() => {
+            inquiriesCard.classList.remove('ring-4', 'ring-red-400', 'ring-opacity-75');
+          }, 800);
+        }
+      }, 100);
+      
       // Auto-populate fields with typing effect after bulk selection
       const wasFirstBulkSelection = Object.values(selectedItems).every(value => !value);
       
@@ -288,10 +365,7 @@ export function ModernInquiries({ creditData }: ModernInquiriesProps) {
             // Scroll to position element exactly at the top with no offset
             const targetScrollY = Math.max(0, elementTop + 5);
             
-            window.scrollTo({ 
-              top: targetScrollY, 
-              behavior: 'smooth' 
-            });
+            // Removed scrolling to keep section in view
           } else {
             console.log("Could not find element to scroll to");
             // Fallback: scroll to the inquiries section
@@ -300,10 +374,7 @@ export function ModernInquiries({ creditData }: ModernInquiriesProps) {
               console.log("Scrolling to inquiries section as fallback");
               const rect = inquiriesSection.getBoundingClientRect();
               const offsetTop = window.pageYOffset + rect.top - 80;
-              window.scrollTo({ 
-                top: offsetTop, 
-                behavior: 'smooth' 
-              });
+              // Removed scrolling to keep section in view
             }
           }
         }, 500);
@@ -410,20 +481,13 @@ export function ModernInquiries({ creditData }: ModernInquiriesProps) {
 
 
 
-  // Show minimized view if no recent score-impacting inquiries and not expanded
-  if (recentInquiries.length === 0 && !showInquiryDetails) {
+  // Remove internal collapse mechanism - parent page handles all collapse behavior
+
+  // Show minimized view if no recent score-impacting inquiries and not expanded AND no saved dispute data
+  if (recentInquiries.length === 0 && !showInquiryDetails && !initialDisputeData) {
     return (
-      <div className="mb-8" data-section="hard-inquiries">
-        <div className="flex items-start md:items-center gap-3 mb-6">
-          <Search className="w-8 h-8 md:w-6 md:h-6 text-blue-600 mt-1 md:mt-0" />
-          <div className="flex-1">
-            <h2 className="text-2xl font-bold text-gray-900">Hard Inquiries</h2>
-            <div className="text-sm text-gray-500 mt-1 md:hidden">*Inquiries older than 24 months don't impact score</div>
-          </div>
-          <div className="ml-auto hidden md:block">
-            <div className="text-sm text-gray-500">*Inquiries older than 24 months do not impact the score</div>
-          </div>
-        </div>
+      <div className="mb-8">
+
 
         <Card className="border-gray-200 bg-white">
           <CardContent className="p-4">
@@ -470,10 +534,18 @@ export function ModernInquiries({ creditData }: ModernInquiriesProps) {
       
       const currentItem = allItems.find(item => item.id === itemId);
       
-      if (currentItem && checkInquiryMatchesOpenAccount(currentItem)) {
-        // Always show warning dialog for inquiries that match active accounts
-        setWarningDialogs(prev => ({ ...prev, [itemId]: true }));
-        return; // Don't proceed with selection until warning is handled
+      if (currentItem) {
+        // Check if this is an older inquiry with no score impact
+        if (!currentItem.isRecent) {
+          setWarningDialogs(prev => ({ ...prev, [itemId]: true }));
+          return; // Don't proceed with selection until warning is handled
+        }
+        
+        // Check if inquiry matches an open account (for recent inquiries)
+        if (checkInquiryMatchesOpenAccount(currentItem)) {
+          setWarningDialogs(prev => ({ ...prev, [itemId]: true }));
+          return; // Don't proceed with selection until warning is handled
+        }
       }
     }
     
@@ -586,24 +658,14 @@ export function ModernInquiries({ creditData }: ModernInquiriesProps) {
         </div>
         <div className="space-y-3">
           {itemsToShow.length === 0 ? (
-            <div className="text-center py-8 bg-gray-50 rounded-lg border">
-              {showOlder ? (
-                <div>
-                  <div className="flex items-center justify-center mb-3">
-                    <ThumbsUp className="w-8 h-8 text-green-600" />
-                  </div>
-                  <h5 className="text-lg font-semibold text-gray-900 mb-2">Clean slate!</h5>
-                  <p className="text-sm text-gray-500">No older inquiries found</p>
-                </div>
-              ) : (
-                <div>
-                  <div className="flex items-center justify-center mb-3">
-                    <ThumbsUp className="w-8 h-8 text-green-600" />
-                  </div>
-                  <h5 className="text-lg font-semibold text-gray-900 mb-2">Clean slate!</h5>
-                  <p className="text-sm text-gray-500">No recent score-impacting inquiries</p>
-                </div>
-              )}
+            <div className="border border-gray-200 bg-gray-50 rounded-lg p-3 flex items-center justify-center">
+              <div className="text-center">
+                <ThumbsUp className="w-8 h-8 text-green-600 mx-auto mb-2" />
+                <h5 className="text-sm font-semibold text-gray-900 mb-1">Clean slate!</h5>
+                <p className="text-xs text-gray-500">
+                  {showOlder ? "No older inquiries found" : "No recent score-impacting inquiries"}
+                </p>
+              </div>
             </div>
           ) : (
             itemsToShow.map(renderInquiryItem)
@@ -613,26 +675,60 @@ export function ModernInquiries({ creditData }: ModernInquiriesProps) {
     );
   };
 
-  return (
-    <div className="mb-8" data-section="hard-inquiries">
-      <div className="flex items-start md:items-center gap-3 mb-6">
-        {isDisputeSaved ? (
-          <CheckCircle className="w-8 h-8 md:w-6 md:h-6 text-green-600 mt-1 md:mt-0" />
-        ) : (
-          <Search className="w-8 h-8 md:w-6 md:h-6 text-blue-600 mt-1 md:mt-0" />
-        )}
-        <div className="flex-1">
-          <h2 className={`text-2xl font-bold transition-colors duration-300 ${
-            isDisputeSaved ? 'text-green-800' : 'text-gray-900'
-          }`}>
-            Hard Inquiries {isDisputeSaved && '✓'}
-          </h2>
-          <div className="text-xs text-gray-500 mt-1 md:hidden">*Inquiries older than 24 months don't impact score</div>
+  // Show collapsed state when dispute is saved
+  if (isCollapsed && isDisputeSaved) {
+    return (
+      <div className="mb-8" data-section="hard-inquiries">
+        <div className="flex justify-between items-end mb-6">
+          <div className="flex items-start md:items-center gap-3 flex-1">
+            <div>
+              <h2 className="text-2xl font-bold text-green-800 transition-colors duration-300 flex items-center gap-2">
+                <span className="text-green-600">✓</span>
+                Hard Inquiries
+              </h2>
+              <p className="text-xs text-gray-500 mt-1 md:hidden">*Inquiries older than 24 months don't impact score</p>
+            </div>
+          </div>
+          <p className="text-xs text-gray-500 hidden md:block">*Inquiries older than 24 months do not impact the score</p>
         </div>
-        <div className="ml-auto hidden md:block">
-          <div className="text-xs text-gray-500">*Inquiries older than 24 months do not impact the score</div>
-        </div>
+        
+        <Card className="border border-green-300 bg-green-50 transition-all duration-300 cursor-pointer hover:bg-green-100">
+          <CardContent className="p-4">
+            <div 
+              className="flex items-center justify-between"
+              onClick={() => setIsCollapsed(false)}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                  <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="font-semibold text-green-700">
+                    {(() => {
+                      const count = Object.values(selectedItems).filter(Boolean).length;
+                      if (count === 0) return 'Section Completed';
+                      return `${count} Inquiry Dispute${count === 1 ? '' : 's'} Saved`;
+                    })()}
+                  </h3>
+                  <p className="text-sm text-green-600 font-medium">
+                    Click to expand and modify
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center justify-center w-8 h-8 text-gray-600 hover:text-gray-800 transition-colors">
+                <ChevronDown className="w-4 h-4" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
+    );
+  }
+
+  return (
+    <div className="mb-8">
 
       <Card className={`border transition-all duration-500 ${
         isDisputeSaved 
@@ -641,7 +737,30 @@ export function ModernInquiries({ creditData }: ModernInquiriesProps) {
             ? 'border-red-300 bg-red-50' 
             : 'border-gray-200 bg-white'
       }`}>
-        <CardContent className="p-6">
+        <CardContent className="p-6 relative">
+          {/* Collapse button in top right when saved */}
+          {isDisputeSaved && (
+            <button
+              onClick={() => {
+                console.log("Hard Inquiries up arrow clicked for collapse");
+                setIsCollapsed(true);
+                // Auto-scroll to 20px above the section heading
+                setTimeout(() => {
+                  const inquiriesSection = document.querySelector('[data-section="hard-inquiries"]');
+                  if (inquiriesSection) {
+                    const rect = inquiriesSection.getBoundingClientRect();
+                    const targetScrollY = window.pageYOffset + rect.top - 20;
+                    // Removed scrolling to keep section in view
+                  }
+                }, 100);
+              }}
+              className="absolute top-4 right-4 flex items-center justify-center w-8 h-8 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-full transition-colors z-10"
+              title="Collapse section"
+            >
+              <ChevronUp className="w-4 h-4" />
+            </button>
+          )}
+
           {/* Hide button for expanded inquiry section with no recent inquiries */}
           {recentInquiries.length === 0 && showInquiryDetails && (
             <div className="flex justify-end mb-4">
@@ -664,13 +783,23 @@ export function ModernInquiries({ creditData }: ModernInquiriesProps) {
                 {isDisputeSaved ? '✓' : '1'}
               </span>
               <span className="font-bold">
-                {isDisputeSaved ? 'Hard inquiry dispute completed' : 
+                {isDisputeSaved ? 
+                  (() => {
+                    const count = Object.values(selectedItems).filter(Boolean).length;
+                    if (count === 0) return 'Section completed';
+                    return `${count} inquiry dispute${count === 1 ? '' : 's'} saved`;
+                  })() : 
                   <span>
                     <span className="md:hidden">Choose inquiries (optional)</span>
-                    <span className="hidden md:inline">Choose unauthorized inquiries to dispute (optional)*</span>
+                    <span className="hidden md:inline">Choose inquiries to dispute (optional)*</span>
                   </span>
                 }
               </span>
+              {isDisputeSaved && (
+                <span className="block text-sm text-gray-600 font-normal mt-1">
+                  Click to modify your selections
+                </span>
+              )}
             </p>
           </div>
 
@@ -707,14 +836,7 @@ export function ModernInquiries({ creditData }: ModernInquiriesProps) {
                   setShowOlderInquiries(false);
                   
                   // When collapsing, scroll back to section start for both mobile and desktop
-                  setTimeout(() => {
-                    const inquiriesSection = document.querySelector('[data-section="hard-inquiries"]');
-                    if (inquiriesSection) {
-                      const rect = inquiriesSection.getBoundingClientRect();
-                      const offsetTop = window.pageYOffset + rect.top - 80;
-                      window.scrollTo({ top: offsetTop, behavior: 'smooth' });
-                    }
-                  }, 100);
+                  // Removed scrolling to keep section in view
                 }}
               >
                 <div className="flex items-center gap-3">
@@ -745,15 +867,7 @@ export function ModernInquiries({ creditData }: ModernInquiriesProps) {
                     setSelectedItems({});
                     setShowOlderInquiries(false);
                     
-                    // When collapsing, scroll back to section start for both mobile and desktop
-                    setTimeout(() => {
-                      const inquiriesSection = document.querySelector('[data-section="hard-inquiries"]');
-                      if (inquiriesSection) {
-                        const rect = inquiriesSection.getBoundingClientRect();
-                        const offsetTop = window.pageYOffset + rect.top - 80;
-                        window.scrollTo({ top: offsetTop, behavior: 'smooth' });
-                      }
-                    }, 100);
+                    // Removed scrolling to keep section in view
                   }}
                   className="flex items-center gap-2 text-blue-600 hover:text-blue-800 text-sm font-medium transition-colors"
                 >
@@ -796,15 +910,7 @@ export function ModernInquiries({ creditData }: ModernInquiriesProps) {
                     onClick={() => {
                       setShowRecentInquiries(false);
                       
-                      // When collapsing, scroll back to section start for both mobile and desktop
-                      setTimeout(() => {
-                        const inquiriesSection = document.querySelector('[data-section="hard-inquiries"]');
-                        if (inquiriesSection) {
-                          const rect = inquiriesSection.getBoundingClientRect();
-                          const offsetTop = window.pageYOffset + rect.top - 20;
-                          window.scrollTo({ top: offsetTop, behavior: 'smooth' });
-                        }
-                      }, 100);
+                      // Removed scrolling to keep section in view
                     }}
                     className="flex-1 text-left hover:bg-gray-50 transition-colors p-2 rounded mr-2"
                   >
@@ -850,11 +956,19 @@ export function ModernInquiries({ creditData }: ModernInquiriesProps) {
                         newSelections[item.id] = true;
                       });
                       setSelectedItems(newSelections);
+                      
+                      // Auto-populate reason and instruction for quick testing
+                      setSelectedReason("I did not authorize this inquiry");
+                      setSelectedInstruction("Please remove this unauthorized inquiry from my credit report");
+                      setShowCustomReasonField(false);
+                      setShowCustomInstructionField(false);
+                      console.log("Hard Inquiries: Auto-populated reason and instruction");
                     }}
                     className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 hover:text-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-1 shrink-0"
                   >
                     Select All Score-Impact Items
                   </button>
+
                 </div>
 
                 {/* Mobile layout - header and button stacked */}
@@ -865,14 +979,7 @@ export function ModernInquiries({ creditData }: ModernInquiriesProps) {
                       
                       // On mobile, scroll back to section start when collapsing
                       if (window.innerWidth < 768) {
-                        setTimeout(() => {
-                          const inquiriesSection = document.querySelector('[data-section="hard-inquiries"]');
-                          if (inquiriesSection) {
-                            const rect = inquiriesSection.getBoundingClientRect();
-                            const offsetTop = window.pageYOffset + rect.top - 20;
-                            window.scrollTo({ top: offsetTop, behavior: 'smooth' });
-                          }
-                        }, 100);
+                        // Removed scrolling to keep section in view
                       }
                     }}
                     className="w-full text-left hover:bg-gray-50 transition-colors p-2 rounded mb-3"
@@ -919,6 +1026,19 @@ export function ModernInquiries({ creditData }: ModernInquiriesProps) {
                         newSelections[item.id] = true;
                       });
                       setSelectedItems(newSelections);
+                      
+                      // Auto-scroll to dispute section after selection
+                      setTimeout(() => {
+                        console.log("Auto-scrolling after direct selection (no warnings)");
+                        const disputeSection = document.querySelector('[data-section="inquiries"] .pt-3') || 
+                                             document.querySelector('[data-section="inquiries"]');
+                        if (disputeSection) {
+                          console.log("Found dispute section, scrolling");
+                          disputeSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        } else {
+                          console.log("Could not find dispute section for scroll");
+                        }
+                      }, 200);
                     }}
                     className="w-full px-3 py-2 text-sm font-medium text-gray-600 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 hover:text-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-1"
                   >
@@ -945,15 +1065,7 @@ export function ModernInquiries({ creditData }: ModernInquiriesProps) {
                     setSelectedItems({});
                     setShowRecentInquiries(false);
                     
-                    // When collapsing, scroll back to section start for both mobile and desktop
-                    setTimeout(() => {
-                      const inquiriesSection = document.querySelector('[data-section="hard-inquiries"]');
-                      if (inquiriesSection) {
-                        const rect = inquiriesSection.getBoundingClientRect();
-                        const offsetTop = window.pageYOffset + rect.top - 20;
-                        window.scrollTo({ top: offsetTop, behavior: 'smooth' });
-                      }
-                    }, 100);
+                    // Removed scrolling to keep section in view
                   }}
                   className="flex items-center gap-2 text-blue-600 hover:text-blue-800 text-sm font-medium transition-colors"
                 >
@@ -1005,6 +1117,10 @@ export function ModernInquiries({ creditData }: ModernInquiriesProps) {
                         <Select
                           value={selectedReason}
                           onValueChange={(value) => {
+                            // Reset dispute saved state when dropdown is changed
+                            if (isDisputeSaved) {
+                              setIsDisputeSaved(false);
+                            }
                             if (value === "custom") {
                               setShowCustomReasonField(true);
                               setSelectedReason("");
@@ -1014,7 +1130,7 @@ export function ModernInquiries({ creditData }: ModernInquiriesProps) {
                             setTimeout(() => checkFormCompletionAndShowArrow(), 300);
                           }}
                         >
-                          <SelectTrigger className="w-full">
+                          <SelectTrigger className="w-full border-gray-300">
                             <SelectValue placeholder="Select reason for disputing inquiry" />
                           </SelectTrigger>
                           <SelectContent>
@@ -1042,11 +1158,17 @@ export function ModernInquiries({ creditData }: ModernInquiriesProps) {
                           <textarea
                             value={customReason || ""}
                             placeholder="Enter your dispute reason..."
-                            className="w-full p-3 border border-gray-300 rounded-md h-20 resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            onChange={(e) => setCustomReason(e.target.value)}
+                            className="w-full p-3 border border-gray-300 rounded-md h-20 resize-none mobile-resizable focus:outline-none focus:border-gray-400"
+                            onChange={(e) => {
+                              setCustomReason(e.target.value);
+                              // Reset dispute saved state when text is modified
+                              if (isDisputeSaved) {
+                                setIsDisputeSaved(false);
+                              }
+                            }}
                             rows={3}
                           />
-                          {customReason.trim() && (
+                          {false && customReason.trim() && (
                             <div className="flex justify-end">
                               <button
                                 onClick={() => {
@@ -1075,7 +1197,7 @@ export function ModernInquiries({ creditData }: ModernInquiriesProps) {
                 <div>
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
-                      <label className="text-sm font-medium text-gray-700">Dispute Instructions</label>
+                      <label className="text-sm font-medium text-gray-700">Dispute Instruction</label>
                     </div>
                     <div className="relative">
                       {isTypingInstruction ? (
@@ -1100,6 +1222,10 @@ export function ModernInquiries({ creditData }: ModernInquiriesProps) {
                         <Select
                           value={selectedInstruction}
                           onValueChange={(value) => {
+                            // Reset dispute saved state when dropdown is changed
+                            if (isDisputeSaved) {
+                              setIsDisputeSaved(false);
+                            }
                             if (value === "custom") {
                               setShowCustomInstructionField(true);
                               setSelectedInstruction("");
@@ -1109,7 +1235,7 @@ export function ModernInquiries({ creditData }: ModernInquiriesProps) {
                             setTimeout(() => checkFormCompletionAndShowArrow(), 300);
                           }}
                         >
-                          <SelectTrigger className="w-full">
+                          <SelectTrigger className="w-full border-gray-300">
                             <SelectValue placeholder="Select dispute instructions" />
                           </SelectTrigger>
                           <SelectContent>
@@ -1137,11 +1263,17 @@ export function ModernInquiries({ creditData }: ModernInquiriesProps) {
                           <textarea
                             value={customInstruction || ""}
                             placeholder="Enter your dispute instructions..."
-                            className="w-full p-3 border border-gray-300 rounded-md h-20 resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            onChange={(e) => setCustomInstruction(e.target.value)}
+                            className="w-full p-3 border border-gray-300 rounded-md h-20 resize-none mobile-resizable focus:outline-none focus:border-gray-400"
+                            onChange={(e) => {
+                              setCustomInstruction(e.target.value);
+                              // Reset dispute saved state when text is modified
+                              if (isDisputeSaved) {
+                                setIsDisputeSaved(false);
+                              }
+                            }}
                             rows={3}
                           />
-                          {customInstruction.trim() && (
+                          {false && customInstruction.trim() && (
                             <div className="flex justify-end">
                               <button
                                 onClick={() => {
@@ -1190,30 +1322,98 @@ export function ModernInquiries({ creditData }: ModernInquiriesProps) {
                     <span className="inline-flex items-center justify-center w-6 h-6 md:w-5 md:h-5 bg-blue-600 text-white text-sm font-bold rounded-full mr-1">3</span>
                     <Button
                       onClick={() => {
-                      const selectedItemsList = Object.keys(selectedItems).filter(key => selectedItems[key]);
-                      console.log("Saving hard inquiry dispute:", {
-                        selectedItems: selectedItemsList,
-                        reason: showCustomReasonField ? customReason : selectedReason,
-                        instruction: showCustomInstructionField ? customInstruction : selectedInstruction
-                      });
-                      
-                      setIsDisputeSaved(true);
-                      
-                      // Auto-scroll to next section without clearing the form
-                      setTimeout(() => {
-                        const nextSection = document.querySelector('[data-section="credit-accounts"]');
-                        if (nextSection) {
-                          const rect = nextSection.getBoundingClientRect();
-                          const offsetTop = window.pageYOffset + rect.top - 80;
-                          window.scrollTo({ top: offsetTop, behavior: 'smooth' });
+                      // If already saved and no changes were made, still trigger choreography
+                      if (isDisputeSaved && initialDisputeData) {
+                        console.log('SAVE CLICKED - Already saved dispute, triggering choreography');
+                        // Maintain saved state but still call parent for choreography
+                        if (onDisputeSaved) {
+                          const disputeData = {
+                            reason: selectedReason || "I did not authorize this inquiry",
+                            instruction: selectedInstruction || "Please remove this unauthorized inquiry from my credit report",
+                            selectedItems
+                          };
+                          onDisputeSaved(disputeData);
                         }
-                      }, 500);
+                        return;
+                      }
+                      
+                      console.log('SAVE CLICKED - Checking typing state:', { isTypingReason, isTypingInstruction });
+                      
+                      // If typing is in progress, complete it immediately before saving
+                      if (isTypingReason || isTypingInstruction) {
+                        console.log('SAVE CLICKED - Typing in progress, completing immediately');
+                        
+                        // Complete any ongoing typing animations immediately
+                        if (isTypingReason) {
+                          setIsTypingReason(false);
+                          // Force the complete reason text regardless of current state
+                          setSelectedReason("I did not authorize this inquiry");
+                        }
+                        
+                        if (isTypingInstruction) {
+                          setIsTypingInstruction(false);
+                          // Force the complete instruction text regardless of current state
+                          setSelectedInstruction("Please remove this unauthorized inquiry from my credit report");
+                        }
+                        
+                        // Wait a brief moment for state to update, then save
+                        setTimeout(() => {
+                          performSave();
+                        }, 100);
+                      } else {
+                        // No typing in progress, save immediately
+                        performSave();
+                      }
+                      
+                      function performSave() {
+                        const selectedItemsList = Object.keys(selectedItems).filter(key => selectedItems[key]);
+                        console.log(`Saved ${selectedItemsList.length} hard inquiry disputes`);
+                        
+                        // Show green state and call parent handler immediately
+                        setIsDisputeSaved(true);
+                        
+                        // Call parent handler for choreography - let main page handle timing
+                        if (onDisputeSaved) {
+                          // Force complete text values when auto-typing was used
+                          let finalReason = selectedReason.trim() || customReason.trim();
+                          let finalInstruction = selectedInstruction.trim() || customInstruction.trim();
+                          
+                          // If we have auto-selected items and default text patterns, ensure complete text
+                          const hasAutoSelectedItems = Object.keys(selectedItems).some(key => 
+                            selectedItems[key] && key.includes('inquiry')
+                          );
+                          
+                          if (hasAutoSelectedItems) {
+                            // For inquiry disputes, always use complete expected text
+                            if (!finalReason || finalReason === "I did not authorize this inquiry") {
+                              finalReason = "I did not authorize this inquiry";
+                            }
+                            if (!finalInstruction || finalInstruction.includes("Please remove this unauthorized")) {
+                              finalInstruction = "Please remove this unauthorized inquiry from my credit report";
+                            }
+                          }
+                          
+                          console.log('SAVE DEBUG - Final reason text:', finalReason);
+                          console.log('SAVE DEBUG - Final instruction text:', finalInstruction);
+                          console.log('SAVE DEBUG - Instruction length:', finalInstruction.length);
+                          
+                          const disputeData = {
+                            reason: finalReason,
+                            instruction: finalInstruction,
+                            selectedItems
+                          };
+                          console.log('SAVE DEBUG - Complete disputeData:', disputeData);
+                          onDisputeSaved(disputeData);
+                        }
+                      }
                     }}
-                    disabled={
-                      !hasSelectedItems ||
-                      (showCustomReasonField ? !customReason.trim() : !selectedReason) || 
-                      (showCustomInstructionField ? !customInstruction.trim() : !selectedInstruction)
-                    }
+                    disabled={(() => {
+                      const hasReason = selectedReason.trim() || customReason.trim();
+                      const hasInstruction = selectedInstruction.trim() || customInstruction.trim();
+                      const isDisabled = !hasSelectedItems || !hasReason || !hasInstruction;
+                      
+                      return isDisabled;
+                    })()}
                     className={`${
                       isDisputeSaved 
                         ? 'bg-green-600 hover:bg-green-700' 
@@ -1256,25 +1456,48 @@ export function ModernInquiries({ creditData }: ModernInquiriesProps) {
             <div className="bg-white rounded-lg p-6 max-w-md mx-4 shadow-xl">
               <div className="flex items-start gap-4">
                 <div className="flex-shrink-0">
-                  <AlertTriangle className="w-8 h-8 text-red-500" />
+                  <AlertTriangle className={`w-8 h-8 ${checkInquiryMatchesOpenAccount(item) ? 'text-red-500' : 'text-amber-500'}`} />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                    Warning: Potential Account Match
-                  </h3>
-                  <p className="text-gray-700 mb-4">
-                    The inquiry from <strong>{item.name}</strong> appears to match an open account on your credit report. 
-                    Disputing this inquiry may:
-                  </p>
-                  <ul className="list-disc pl-5 text-gray-700 mb-4 space-y-1">
-                    <li>Potentially close your open account</li>
-                    <li>Reduce your available credit</li>
-                    <li>Negatively impact your credit score</li>
-                    <li>Affect your credit utilization ratio</li>
-                  </ul>
-                  <p className="text-gray-700 mb-6">
-                    Only dispute this inquiry if you're certain it was unauthorized or if you're willing to accept these risks.
-                  </p>
+                  {!item.isRecent ? (
+                    // Warning for older inquiries with no score impact
+                    <>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                        {checkInquiryMatchesOpenAccount(item) ? 'WARNING' : 'No Score Impact'}
+                      </h3>
+                      <p className="text-gray-700 mb-4">
+                        This inquiry from <strong>{item.name}</strong> is over 2 years old and doesn't affect your credit score. There's no reason to dispute it.
+                      </p>
+                      {checkInquiryMatchesOpenAccount(item) && (
+                        <p className="text-gray-700 mb-6">
+                          Also, this inquiry matches an open account on your report. Disputing this could close your account and hurt your credit score.
+                        </p>
+                      )}
+                    </>
+                  ) : checkInquiryMatchesOpenAccount(item) ? (
+                    // Warning for inquiries that match open accounts
+                    <>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                        Open Account Found
+                      </h3>
+                      <p className="text-gray-700 mb-4">
+                        This inquiry from <strong>{item.name}</strong> matches an open account on your report.
+                      </p>
+                      <p className="text-gray-700 mb-6">
+                        Disputing this could close your account and hurt your credit score.
+                      </p>
+                    </>
+                  ) : (
+                    // Default warning (shouldn't happen with current logic)
+                    <>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                        Warning
+                      </h3>
+                      <p className="text-gray-700 mb-6">
+                        Please review this inquiry carefully before disputing.
+                      </p>
+                    </>
+                  )}
                   <div className="flex gap-3">
                     <Button
                       onClick={() => handleWarningResponse(itemId, false)}
@@ -1285,9 +1508,9 @@ export function ModernInquiries({ creditData }: ModernInquiriesProps) {
                     </Button>
                     <Button
                       onClick={() => handleWarningResponse(itemId, true)}
-                      className="flex-1 bg-red-600 hover:bg-red-700"
+                      className={`flex-1 ${checkInquiryMatchesOpenAccount(item) ? 'bg-red-600 hover:bg-red-700' : 'bg-amber-600 hover:bg-amber-700'}`}
                     >
-                      Proceed Anyway
+                      Continue Anyway
                     </Button>
                   </div>
                 </div>
