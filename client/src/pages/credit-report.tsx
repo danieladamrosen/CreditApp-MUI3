@@ -415,14 +415,14 @@ export default function CreditReportPage() {
   };
 
   const handleViewAiDetails = () => {
-    const personalInfoSection = document.querySelector('[data-section="personal-info"]');
-    if (personalInfoSection) {
-      personalInfoSection.scrollIntoView({ 
+    const quickStartBox = document.getElementById('quick-start-instructions');
+    if (quickStartBox) {
+      quickStartBox.scrollIntoView({ 
         behavior: 'smooth',
         block: 'start'
       });
       setTimeout(() => {
-        window.scrollBy(0, -80);
+        window.scrollBy(0, -15);
       }, 500);
     }
   };
@@ -500,21 +500,34 @@ export default function CreditReportPage() {
         if (areAllNegativeAccountsSavedWithUpdatedState(updatedDisputes)) {
           console.log("All account disputes saved, waiting 1 second before collapsing section");
           
-          // Wait 1 second after individual card collapse, then collapse the entire section
+          // Wait 1 second after individual card collapse, then scroll to top and collapse the entire section
           setTimeout(() => {
-            console.log("Collapsing entire negative accounts section");
-            setAllAccountsCollapsed(true);
+            console.log("Credit Accounts: Scrolling to top of section before collapse");
             
-            // Wait for the section collapse animation to complete, then scroll to public records
-            setTimeout(() => {
-              console.log("Scrolling to public records section");
-              const publicRecordsSection = document.querySelector('[data-section="public-records"]');
-              if (publicRecordsSection) {
-                const rect = publicRecordsSection.getBoundingClientRect();
-                const targetScrollY = window.pageYOffset + rect.top - 20;
-                window.scrollTo({ top: targetScrollY, behavior: 'smooth' });
-              }
-            }, 1000); // Wait for section collapse animation
+            // First, scroll to the top of the Credit Accounts section so user can see the collapse
+            const currentSection = document.querySelector('[data-section="credit-accounts"]');
+            if (currentSection) {
+              const rect = currentSection.getBoundingClientRect();
+              const targetY = window.pageYOffset + rect.top - 20;
+              window.scrollTo({ top: targetY, behavior: 'smooth' });
+              
+              // Wait for scroll to complete, then collapse
+              setTimeout(() => {
+                console.log("Credit Accounts: Scroll to top complete, now collapsing section");
+                setAllAccountsCollapsed(true);
+                
+                // Wait for the section collapse animation to complete, then scroll to public records
+                setTimeout(() => {
+                  console.log("Credit Accounts: Collapse complete, scrolling to public records");
+                  const publicRecordsSection = document.querySelector('[data-section="public-records"]');
+                  if (publicRecordsSection) {
+                    const rect = publicRecordsSection.getBoundingClientRect();
+                    const targetScrollY = window.pageYOffset + rect.top - 20;
+                    window.scrollTo({ top: targetScrollY, behavior: 'smooth' });
+                  }
+                }, 1000); // Wait for section collapse animation
+              }, 800); // Wait longer for scroll to complete
+            }
           }, 1000); // 1 second delay after individual card collapse
         } else {
           console.log("Not all accounts saved yet, scrolling to next undisputed account");
@@ -697,32 +710,43 @@ export default function CreditReportPage() {
     instruction: string;
     selectedItems: {[key: string]: boolean};
   }) => {
-    console.log("Hard Inquiries choreography starting");
-    console.log("PARENT DEBUG - Received disputeData:", disputeData);
+    console.log("Hard Inquiries dispute saved - exact public records choreography");
     
-    // Step 1: Store dispute data and mark as saved
+    // Store dispute data and mark as saved
     if (disputeData) {
-      console.log("PARENT DEBUG - Setting hardInquiriesDispute:", disputeData);
       setHardInquiriesDispute(disputeData);
     }
     setSavedDisputes(prev => ({ ...prev, 'hard-inquiries': true }));
     
-    // Step 2: Wait 1 second, then collapse section
+    // Exact public records choreography: 1 second wait, scroll to top of section, collapse, then scroll to next section
     setTimeout(() => {
-      console.log("Hard Inquiries: 1 second wait complete, collapsing section");
-      setHardInquiriesCollapsed(true);
+      console.log("Hard Inquiries: 1 second wait complete, scrolling to top of section");
       
-      // Step 3: Wait for collapse animation, then scroll to next section 20px above
-      setTimeout(() => {
-        console.log("Hard Inquiries: Collapse complete, scrolling to Credit Accounts");
-        const nextSection = document.querySelector('[data-section="credit-accounts"]');
-        if (nextSection) {
-          const rect = nextSection.getBoundingClientRect();
-          const targetY = window.pageYOffset + rect.top - 20;
-          console.log("Hard Inquiries: Scrolling to", targetY);
-          window.scrollTo({ top: targetY, behavior: 'smooth' });
-        }
-      }, 500);
+      // First, scroll to the top of the Hard Inquiries section so user can see the collapse
+      const currentSection = document.querySelector('[data-section="inquiries"]');
+      if (currentSection) {
+        const rect = currentSection.getBoundingClientRect();
+        const targetY = window.pageYOffset + rect.top - 20;
+        window.scrollTo({ top: targetY, behavior: 'smooth' });
+        
+        // Wait for scroll to complete, then collapse
+        setTimeout(() => {
+          console.log("Hard Inquiries: Scroll to top complete, now collapsing section");
+          setHardInquiriesCollapsed(true);
+          
+          // Wait for collapse animation, then scroll to Credit Accounts section 20px above
+          setTimeout(() => {
+            console.log("Hard Inquiries: Collapse complete, scrolling to Credit Accounts");
+            const nextSection = document.querySelector('[data-section="credit-accounts"]');
+            if (nextSection) {
+              const rect = nextSection.getBoundingClientRect();
+              const targetY = window.pageYOffset + rect.top - 20;
+              console.log("Hard Inquiries: Scrolling to", targetY);
+              window.scrollTo({ top: targetY, behavior: 'smooth' });
+            }
+          }, 700); // Match the collapse animation timing
+        }, 500); // Wait for scroll to complete
+      }
     }, 1000);
   };
 
@@ -1137,6 +1161,8 @@ export default function CreditReportPage() {
 
 
 
+
+
         {/* Name Section - Step 2: CRC Professional Typography */}
         <Box sx={{ textAlign: 'center', mb: 4 }}>
           <Typography 
@@ -1178,78 +1204,124 @@ export default function CreditReportPage() {
                 <Button 
                   onClick={handleAiScan} 
                   disabled={isAiScanning}
-                  variant="contained"
+                  variant="outlined"
                   sx={{
-                    backgroundColor: '#2563eb',
+                    backgroundColor: 'transparent',
+                    border: '2px solid #1e40af',
+                    color: '#1e40af',
                     '&:hover': {
-                      backgroundColor: '#1d4ed8',
-                      transform: 'scale(1.02)'
+                      backgroundColor: '#1e40af',
+                      color: 'white !important',
+                      transform: 'scale(1.02)',
+                      '& .MuiTypography-root': {
+                        color: 'white !important'
+                      },
+                      '& .ai-icon': {
+                        color: 'white !important',
+                        stroke: 'white !important'
+                      },
+                      '& svg': {
+                        color: 'white !important',
+                        stroke: 'white !important',
+                        fill: 'none !important'
+                      }
                     },
-                    color: 'white',
-                    fontSize: { xs: '1.25rem', md: '2.5rem' },
+                    '&:disabled': {
+                      backgroundColor: 'transparent',
+                      border: '2px solid #94a3b8',
+                      color: '#94a3b8'
+                    },
+                    fontSize: { xs: '1.25rem', md: '1.5rem' },
                     fontWeight: 600,
                     borderRadius: 2,
-                    boxShadow: 3,
-                    transition: 'all 0.2s',
-                    minWidth: { xs: '220px', md: '280px' },
-                    minHeight: { xs: '50px', md: '50px' },
-                    px: { xs: 2, md: 4 },
-                    py: { xs: 1.5, md: 1.5 },
+                    boxShadow: 2,
+                    transition: 'all 0.3s ease-in-out',
+                    minWidth: { xs: '120px', md: '140px' },
+                    minHeight: { xs: '28px', md: '32px' },
+                    px: { xs: 1, md: 1.5 },
+                    py: { xs: 0.5, md: 1 },
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center'
                   }}
                 >
                   {isAiScanning ? (
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <CircularProgress size={20} sx={{ color: 'white', mr: 1.5 }} />
-                      <Typography sx={{ color: 'white' }}>Scanning...</Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <CircularProgress size={24} sx={{ color: '#1e40af' }} />
+                      <Typography sx={{ color: '#1e40af', fontWeight: 600 }}>
+                        AI Scanning...
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 0.5 }}>
+                        <Box sx={{ 
+                          width: 2, height: 16, backgroundColor: '#1e40af', 
+                          borderRadius: 1, animation: 'pulse 1s infinite' 
+                        }} />
+                        <Box sx={{ 
+                          width: 2, height: 12, backgroundColor: '#1e40af', 
+                          borderRadius: 1, animation: 'pulse 1s infinite', 
+                          animationDelay: '0.1s' 
+                        }} />
+                        <Box sx={{ 
+                          width: 2, height: 20, backgroundColor: '#1e40af', 
+                          borderRadius: 1, animation: 'pulse 1s infinite',
+                          animationDelay: '0.2s' 
+                        }} />
+                      </Box>
                     </Box>
                   ) : (
                     <Box sx={{ 
                       display: 'flex', 
-                      flexDirection: 'column', 
                       alignItems: 'center', 
                       justifyContent: 'center',
+                      gap: 2,
                       height: '100%',
                       width: '100%'
                     }}>
-                      <Box sx={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'center',
-                        mb: { xs: 0, md: 1 }
-                      }}>
-                        <Zap 
-                          size={20} 
-                          className="text-white animate-pulse mr-2"
-                        />
-                        <Typography sx={{ 
-                          color: 'white', 
-                          fontWeight: 600, 
-                          textTransform: 'none',
-                          fontSize: { xs: '1.3rem', md: '1.4rem' },
-                          whiteSpace: 'nowrap'
-                        }}>
-                          AI Metro 2 / Compliance Scan
-                        </Typography>
-                        <Zap 
-                          size={20} 
-                          className="text-white animate-pulse ml-2"
-                        />
-                      </Box>
+                      {/* Zap Icon - Outline Only */}
+                      <svg 
+                        className="ai-icon"
+                        width="18" 
+                        height="18" 
+                        viewBox="0 0 24 24" 
+                        fill="none"
+                        stroke="#1e40af"
+                        strokeWidth="2"
+                        style={{ 
+                          color: '#1e40af',
+                          animation: 'pulse 2s ease-in-out infinite',
+                          transformOrigin: 'center'
+                        }}
+                      >
+                        <polygon points="13,2 3,14 12,14 11,22 21,10 12,10 13,2"/>
+                      </svg>
+
                       <Typography sx={{ 
-                        fontSize: '10px',
-                        color: 'white',
-                        opacity: 0.8,
-                        textAlign: 'center',
-                        lineHeight: 1.2,
-                        px: 3,
-                        display: { xs: 'none', md: 'block' },
-                        textTransform: 'none'
+                        color: '#1e40af', 
+                        fontWeight: 600, 
+                        textTransform: 'none',
+                        fontSize: { xs: '0.85rem', md: '0.95rem' },
+                        whiteSpace: 'nowrap'
                       }}>
-                        Powered by AI to identify violations and generate best practice dispute suggestions
+                        AI Metro 2 Compliance Analysis
                       </Typography>
+
+                      {/* Sparkles Icon - Outline Only */}
+                      <svg 
+                        className="ai-icon"
+                        width="16" 
+                        height="16" 
+                        viewBox="0 0 24 24" 
+                        fill="none"
+                        stroke="#1e40af"
+                        strokeWidth="2"
+                        style={{ 
+                          color: '#1e40af',
+                          animation: 'pulse 2s ease-in-out infinite',
+                          transformOrigin: 'center'
+                        }}
+                      >
+                        <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.582a.5.5 0 0 1 0 .962L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>
+                      </svg>
                     </Box>
                   )}
                 </Button>
@@ -1269,7 +1341,7 @@ export default function CreditReportPage() {
                 {/* Header with AI branding */}
                 <div className="text-center mb-8">
                   <div className="flex items-center justify-center gap-3 mb-4">
-                    <div className="w-12 h-12 bg-[#2563eb] rounded-full flex items-center justify-center shadow-lg">
+                    <div className="w-12 h-12 bg-[#1e40af] rounded-full flex items-center justify-center shadow-lg">
                       <Zap className="w-6 h-6 text-white" />
                     </div>
                     <div className="text-left">
@@ -1334,12 +1406,12 @@ export default function CreditReportPage() {
                       const quickStartBox = document.getElementById('quick-start-instructions');
                       if (quickStartBox) {
                         const rect = quickStartBox.getBoundingClientRect();
-                        const offsetTop = window.pageYOffset + rect.top - 30;
+                        const offsetTop = window.pageYOffset + rect.top - 15;
                         window.scrollTo({ top: offsetTop, behavior: 'smooth' });
                       }
                     }, 200);
                   }}
-                  className="relative w-full bg-[#2563eb] hover:bg-[#1d4ed8] text-white rounded-lg p-4 transition-all duration-200 shadow-md hover:shadow-lg overflow-hidden"
+                  className="relative w-full bg-[#1e40af] hover:bg-[#1d4ed8] text-white rounded-lg p-4 transition-all duration-200 shadow-md hover:shadow-lg overflow-hidden"
                 >
                   {/* Magical shimmer effect - triggers once on modal appear */}
                   <div className="absolute inset-0 -top-4 -bottom-4 bg-gradient-to-r from-transparent via-white/30 to-transparent translate-x-[-100%]" 
@@ -1370,11 +1442,11 @@ export default function CreditReportPage() {
                 <div className="bg-white border-2 border-gray-200 rounded-xl p-8 mx-4 max-w-2xl shadow-2xl">
                   <div className="text-center">
                     <div className="relative mb-6">
-                      <div className="w-16 h-16 bg-[#2563eb] rounded-full flex items-center justify-center mx-auto">
+                      <div className="w-16 h-16 bg-[#1e40af] rounded-full flex items-center justify-center mx-auto">
                         <Zap className="w-8 h-8 text-white animate-pulse" />
                       </div>
-                      <div className="absolute -inset-2 bg-[#2563eb] rounded-full opacity-20 animate-ping"></div>
-                      <div className="absolute -inset-4 bg-[#2563eb] rounded-full opacity-10 animate-ping" style={{ animationDelay: '0.5s' }}></div>
+                      <div className="absolute -inset-2 bg-[#1e40af] rounded-full opacity-20 animate-ping"></div>
+                      <div className="absolute -inset-4 bg-[#1e40af] rounded-full opacity-10 animate-ping" style={{ animationDelay: '0.5s' }}></div>
                     </div>
                     
                     <div className="mb-6">
@@ -1417,7 +1489,7 @@ export default function CreditReportPage() {
                         {[...Array(12)].map((_, i) => (
                           <div
                             key={i}
-                            className="w-2 h-2 bg-gradient-to-r from-purple-400 to-blue-400 rounded-full opacity-0 animate-pulse"
+                            className="w-2 h-2 bg-[#1e40af] rounded-full opacity-0 animate-pulse"
                             style={{ 
                               animationDelay: `${i * 0.1}s`,
                               animationDuration: '1s',
@@ -1443,8 +1515,21 @@ export default function CreditReportPage() {
 
         <div className="mt-12">
           {/* Instructions for first-time visitors */}
-          <div id="quick-start-instructions" className="mb-6 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-sm text-blue-800">
+          <div id="quick-start-instructions" className="mb-6 p-3 bg-blue-50 border border-blue-200 rounded-lg relative">
+            <button
+              onClick={() => {
+                const quickStartBox = document.getElementById('quick-start-instructions');
+                if (quickStartBox) {
+                  quickStartBox.style.display = 'none';
+                }
+              }}
+              className="absolute top-2 right-2 text-blue-600 hover:text-blue-800 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <p className="text-sm text-blue-800 pr-6">
               <strong>Quick Start:</strong> Look for red negative items or any inaccuracies below. Select a reason and instructions for each, then click save to continue.
             </p>
           </div>
@@ -1822,7 +1907,7 @@ export default function CreditReportPage() {
                         const selectedCount = hardInquiriesDispute?.selectedItems ? 
                           Object.values(hardInquiriesDispute.selectedItems).filter(Boolean).length : 0;
                         if (selectedCount === 0) return 'Section completed';
-                        return `${selectedCount} inquiry dispute${selectedCount === 1 ? '' : 's'} saved`;
+                        return `${selectedCount} dispute${selectedCount === 1 ? '' : 's'} saved`;
                       })()}
                     </h3>
                   </div>
@@ -1868,7 +1953,7 @@ export default function CreditReportPage() {
                     </div>
                     <div className="flex items-center h-12">
                       <h3 className="font-semibold text-green-700">
-                        {Object.keys(savedDisputes).length} Account Disputes Completed <span className="text-sm text-green-600 font-medium">(All Negative Accounts Disputed)</span>
+                        {Object.keys(savedDisputes).length} Disputes Completed <span className="text-sm text-green-600 font-medium">(All Negative Accounts Disputed)</span>
                       </h3>
                     </div>
                   </div>
@@ -2058,58 +2143,89 @@ export default function CreditReportPage() {
                     const publicRecordsCount = 0; // Set to actual count when public records are implemented
                     const totalNegativeCount = negativeAccounts.length + publicRecordsCount;
                     
-                    // Add negative accounts as a connected section
+                    // Add negative accounts with connected header design
                     elements.push(
                       <div key="negative-accounts-section" className="mb-6">
-                        {/* Header */}
-                        <div className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-t-lg border-b-0">
-                          <div className="flex items-center gap-3">
-                            <div className="w-3 h-3 bg-red-600 rounded-full flex-shrink-0"></div>
-                            <div>
-                              <h3 className="font-semibold text-gray-900">
-                                {totalNegativeCount} Negative Account{totalNegativeCount === 1 ? '' : 's'}
-                              </h3>
-                              <p className="text-sm font-medium">
-                                {areAllNegativeAccountsSaved() ? (
-                                  <span className="text-green-600">
-                                    {Object.keys(savedDisputes).length} Disputes Saved
-                                  </span>
-                                ) : Object.keys(savedDisputes).length > 0 ? (
-                                  <span className="text-green-600">
-                                    {Object.keys(savedDisputes).length} Dispute{Object.keys(savedDisputes).length === 1 ? '' : 's'} Saved
-                                  </span>
-                                ) : (
-                                  <span className="text-red-600">Action Required: <span className="text-sm md:text-xs text-gray-600">Complete steps 1-2-3 for each negative account below</span></span>
-                                )}
-                              </p>
+                        {/* Connected header that flows into first account */}
+                        <div className={`bg-white border-t border-l border-r rounded-t-lg ${
+                          areAllNegativeAccountsSaved() ? 'border-green-200' : 'border-red-200'
+                        }`} style={{ borderBottom: 'none' }}>
+                          <div className="flex items-center justify-between p-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-3 h-3 bg-red-600 rounded-full flex-shrink-0"></div>
+                              <div>
+                                <h3 className="font-semibold text-gray-900">
+                                  {totalNegativeCount} Negative Account{totalNegativeCount === 1 ? '' : 's'}
+                                </h3>
+                                <p className="text-sm font-medium">
+                                  {areAllNegativeAccountsSaved() ? (
+                                    <span className="text-green-600">
+                                      ✓ All {Object.keys(savedDisputes).length} Disputes Completed
+                                    </span>
+                                  ) : Object.keys(savedDisputes).length > 0 ? (
+                                    <span className="text-green-600">
+                                      {Object.keys(savedDisputes).length} Dispute{Object.keys(savedDisputes).length === 1 ? '' : 's'} Saved
+                                    </span>
+                                  ) : (
+                                    <span className="text-red-600">Action Required: <span className="text-sm md:text-xs text-gray-600">Complete steps 1-2-3 for each negative account below</span></span>
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {areAllNegativeAccountsSaved() && (
+                                <button
+                                  onClick={() => {
+                                    // Collapse all accounts to complete state
+                                    setExpandAllAccounts(false);
+                                    // Add slight delay for smooth transition
+                                    setTimeout(() => {
+                                      const element = document.querySelector('[data-highlight-target="true"]');
+                                      if (element) {
+                                        element.scrollIntoView({ 
+                                          behavior: 'smooth', 
+                                          block: 'start',
+                                          inline: 'nearest'
+                                        });
+                                      }
+                                    }, 300);
+                                  }}
+                                  className="flex items-center gap-1 text-green-600 hover:text-green-800 font-medium text-sm transition-colors bg-green-50 hover:bg-green-100 px-3 py-1 rounded-md"
+                                >
+                                  <span>Collapse Complete</span>
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                  </svg>
+                                </button>
+                              )}
+                              <button
+                                onClick={() => setExpandAllAccounts(!expandAllAccounts)}
+                                className="hidden md:flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium text-sm transition-colors"
+                              >
+                                <span>{expandAllAccounts ? 'Collapse All' : 'Expand All'}</span>
+                                <svg 
+                                  className={`w-4 h-4 transition-transform ${expandAllAccounts ? 'rotate-180' : ''}`} 
+                                  fill="none" 
+                                  stroke="currentColor" 
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                              </button>
                             </div>
                           </div>
-                          <button
-                            onClick={() => setExpandAllAccounts(!expandAllAccounts)}
-                            className="hidden md:flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium text-sm transition-colors"
-                          >
-                            <span>{expandAllAccounts ? 'Collapse All' : 'Expand All'}</span>
-                            <svg 
-                              className={`w-4 h-4 transition-transform ${expandAllAccounts ? 'rotate-180' : ''}`} 
-                              fill="none" 
-                              stroke="currentColor" 
-                              viewBox="0 0 24 24"
-                            >
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </button>
                         </div>
                         
-                        {/* Connected accounts list */}
-                        <div className="bg-white border border-gray-200 border-t-0 rounded-b-lg px-4 pt-0 pb-6">
-                          <div className="space-y-6">
-                            {negativeAccounts.map((account, index) => {
-                              const accountId = account["@CreditLiabilityID"] || index.toString();
-                              const accountViolations = aiScanCompleted ? (aiViolations[accountId] || []) : [];
-                              
-                              return (
+                        {/* Individual negative accounts - first one connects to header */}
+                        <div className="space-y-6">
+                          {negativeAccounts.map((account, index) => {
+                            const accountId = account["@CreditLiabilityID"] || index.toString();
+                            const accountViolations = aiScanCompleted ? (aiViolations[accountId] || []) : [];
+                            const isFirstAccount = index === 0;
+                            
+                            return (
+                              <div key={`negative-${accountId}`} className={isFirstAccount ? '-mt-1' : ''}>
                                 <ModernAccountRow
-                                  key={`negative-${accountId}`}
                                   account={account}
                                   onDispute={handleDisputeAccount}
                                   aiViolations={accountViolations}
@@ -2119,10 +2235,13 @@ export default function CreditReportPage() {
                                   onDisputeSaved={handleAccountDisputeSaved}
                                   expandAll={expandAllAccounts}
                                   aiScanCompleted={aiScanCompleted}
+                                  savedDisputes={savedDisputes}
+                                  isFirstInConnectedSection={isFirstAccount}
+                                  allNegativeAccountsSaved={areAllNegativeAccountsSaved()}
                                 />
-                              );
-                            })}
-                          </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     );
@@ -2307,7 +2426,7 @@ export default function CreditReportPage() {
                       </div>
                       <div className="flex items-center h-12">
                         <h3 className="font-semibold text-green-700">
-                          3 Public Record Disputes Saved <span className="text-sm text-green-600 font-medium">(Bankruptcy, Lien, Judgment)</span>
+                          3 Disputes Saved <span className="text-sm text-green-600 font-medium">(Bankruptcy, Lien, Judgment)</span>
                         </h3>
                       </div>
                     </div>
