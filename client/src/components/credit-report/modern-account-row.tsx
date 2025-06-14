@@ -32,9 +32,12 @@ interface ModernAccountRowProps {
   disputeInstructions?: string[];
   isFirstCopy?: boolean;
   showDropdowns?: boolean;
-  onDisputeSaved?: (accountId: string) => void;
+  onDisputeSaved?: (accountId: string, disputeData?: { reason: string; instruction: string; violations?: string[] }) => void;
   expandAll?: boolean;
   aiScanCompleted?: boolean;
+  savedDisputes?: {[accountId: string]: boolean | { reason: string; instruction: string; violations?: string[] }};
+  isFirstInConnectedSection?: boolean;
+  allNegativeAccountsSaved?: boolean;
 }
 
 export function ModernAccountRow({ 
@@ -47,7 +50,10 @@ export function ModernAccountRow({
   showDropdowns = false, 
   onDisputeSaved, 
   expandAll = false, 
-  aiScanCompleted = false 
+  aiScanCompleted = false,
+  savedDisputes = {},
+  isFirstInConnectedSection = false,
+  allNegativeAccountsSaved = false
 }: ModernAccountRowProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -79,6 +85,91 @@ export function ModernAccountRow({
   const [selectedViolations, setSelectedViolations] = useState<string[]>([]);
   const [isDisputeSaved, setIsDisputeSaved] = useState(false);
 
+  // Check if this account is in savedDisputes and update internal state
+  useEffect(() => {
+    const accountId = account["@CreditLiabilityID"] || account["@_AccountNumber"] || account["@_AccountIdentifier"] || account["@_SubscriberCode"] || "unknown";
+    if (savedDisputes[accountId]) {
+      setIsDisputeSaved(true);
+      setIsCollapsed(true);
+      
+      // Restore saved dispute data when reopening
+      const savedData = savedDisputes[accountId];
+      if (savedData && typeof savedData === 'object') {
+        // Type guard to ensure we have the right structure
+        const typedSavedData = savedData as { reason?: string; instruction?: string };
+        if (typedSavedData.reason && typedSavedData.instruction) {
+          console.log('RESTORATION - Found saved dispute data for account:', accountId, typedSavedData);
+          
+          // Check if current form is empty or has default/truncated text
+          const currentReason = selectedReason || customReason || '';
+          const currentInstruction = selectedInstruction || customInstruction || '';
+          const isReasonEmpty = !currentReason.trim();
+          const isInstructionEmpty = !currentInstruction.trim();
+          const isReasonTruncated = currentReason.length > 0 && currentReason.length < 30;
+          const isInstructionTruncated = currentInstruction.length > 0 && currentInstruction.length < 30;
+          
+          if (isReasonEmpty || isReasonTruncated || isInstructionEmpty || isInstructionTruncated) {
+            console.log('RESTORATION - Restoring saved text', {
+              isReasonEmpty,
+              isReasonTruncated,
+              isInstructionEmpty,
+              isInstructionTruncated,
+              savedReason: typedSavedData.reason,
+              savedInstruction: typedSavedData.instruction
+            });
+            
+            // Check if saved data contains predefined dropdown values
+            const disputeReasons = [
+              "This account doesn't belong to me",
+              "I already paid this account in full", 
+              "The payment history is wrong",
+              "The balance amount is incorrect",
+              "This account is too old to be reported",
+              "I was a victim of identity theft",
+              "My mother has the same name as me",
+              "My father has the same name as me",
+              "My son has the same name as me"
+            ];
+            
+            const disputeInstructions = [
+              "Please remove this account from my credit report",
+              "Please update this account to show a zero balance",
+              "Please correct the payment history for this account",
+              "Please verify and correct the balance amount",
+              "Please remove this outdated account per FCRA guidelines",
+              "Please remove this fraudulent account immediately",
+              "Please verify the account holder's identity",
+              "Please verify the account holder's identity",
+              "Please verify the account holder's identity"
+            ];
+            
+            if (disputeReasons.includes(typedSavedData.reason)) {
+              // Saved data uses dropdown selection
+              setSelectedReason(typedSavedData.reason);
+              setShowCustomReasonField(false);
+            } else {
+              // Saved data uses custom text
+              setCustomReason(typedSavedData.reason);
+              setShowCustomReasonField(true);
+              setSelectedReason("");
+            }
+            
+            if (disputeInstructions.includes(typedSavedData.instruction)) {
+              // Saved data uses dropdown selection
+              setSelectedInstruction(typedSavedData.instruction);
+              setShowCustomInstructionField(false);
+            } else {
+              // Saved data uses custom text
+              setCustomInstruction(typedSavedData.instruction);
+              setShowCustomInstructionField(true);
+              setSelectedInstruction("");
+            }
+          }
+        }
+      }
+    }
+  }, [savedDisputes, account, selectedReason, customReason, selectedInstruction, customInstruction]);
+
   // UI visibility state
   const [showViolations, setShowViolations] = useState(false);
   const [showAccountDetails, setShowAccountDetails] = useState(false);
@@ -88,6 +179,7 @@ export function ModernAccountRow({
   const [showGuideArrow, setShowGuideArrow] = useState(false);
   const [showPositiveDetails, setShowPositiveDetails] = useState(false);
   const [showGuidedHelp, setShowGuidedHelp] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   // AI typing animation state
   const [isTypingReason, setIsTypingReason] = useState(false);
@@ -201,14 +293,17 @@ export function ModernAccountRow({
     // Set selected suggestion index to track which one is chosen
     setSelectedSuggestionIndex(index);
     
-    // Scroll directly to this account's dispute step using the unique ID
+    // Close the dispute suggestions box immediately
+    setShowGuidedHelp(false);
+    
+    // Add slow scroll to grey divider
     setTimeout(() => {
-      const disputeStepId = `dispute-step-${accountUniqueId}`;
-      const disputeElement = document.getElementById(disputeStepId);
+      const greyDividerId = `grey-divider-${accountUniqueId}`;
+      const greyDivider = document.getElementById(greyDividerId);
       
-      if (disputeElement) {
-        const rect = disputeElement.getBoundingClientRect();
-        const scrollTop = window.pageYOffset + rect.top - 65;
+      if (greyDivider) {
+        const rect = greyDivider.getBoundingClientRect();
+        const scrollTop = window.pageYOffset + rect.top - 100;
         
         window.scrollTo({
           top: scrollTop,
@@ -615,6 +710,9 @@ Due to these reporting inaccuracies and regulatory violations, I am requesting t
   const addAllViolations = async (event: React.MouseEvent<HTMLButtonElement>) => {
     setSelectedViolations([...aiViolations]);
     
+    // Close the violations box immediately
+    setShowViolations(false);
+    
     // Create structured compliance reason with improved format
     const complianceReason = `This tradeline contains multiple compliance violations under Metro 2 and the FCRA:
 ${aiViolations.map(violation => {
@@ -636,30 +734,21 @@ Due to these reporting inaccuracies and regulatory violations, I am requesting t
     setSelectedReason("");
     setSelectedInstruction("");
     
-    // Scroll to step 2 circle (numbered guidance)
-    const currentCard = event.currentTarget.closest('[data-account-id]');
-    if (currentCard) {
-      // Look for the step 2 circle by finding all blue circles and checking their text content
-      const blueCircles = Array.from(currentCard.querySelectorAll('.bg-blue-600'));
-      let step2Element = null;
+    // Add slow scroll to grey divider
+    setTimeout(() => {
+      const greyDividerId = `grey-divider-${accountUniqueId}`;
+      const greyDivider = document.getElementById(greyDividerId);
       
-      for (const circle of blueCircles) {
-        if (circle.textContent && circle.textContent.trim() === '2') {
-          step2Element = circle;
-          break;
-        }
-      }
-      
-      if (step2Element) {
-        const step2Rect = step2Element.getBoundingClientRect();
-        const scrollTop = window.pageYOffset + step2Rect.top - 65; // 65px above step 2
+      if (greyDivider) {
+        const rect = greyDivider.getBoundingClientRect();
+        const scrollTop = window.pageYOffset + rect.top - 100;
         
         window.scrollTo({
           top: scrollTop,
           behavior: 'smooth'
         });
       }
-    }
+    }, 100);
     
     // Wait a moment then start typing animations
     setTimeout(async () => {
@@ -673,7 +762,9 @@ Due to these reporting inaccuracies and regulatory violations, I am requesting t
       await typeText(complianceInstruction, setCustomInstruction, setIsTypingInstruction, 4);
       
       // Check for arrow after both fields are typed
-      setTimeout(() => checkFormCompletionAndShowArrow(complianceReason, complianceInstruction), 500);
+      setTimeout(() => {
+        checkFormCompletionAndShowArrow(complianceReason, complianceInstruction);
+      }, 500);
     }, 150);
   };
 
@@ -815,19 +906,82 @@ Due to these reporting inaccuracies and regulatory violations, I am requesting t
     );
   }
 
+  // Show collapsed state when dispute is saved
+  if (isCollapsed && isDisputeSaved) {
+    return (
+      <Card 
+        className={`transition-all duration-700 shadow-sm border hover:shadow-md border-green-200 bg-green-50/50 ${
+          isFirstInConnectedSection 
+            ? 'rounded-b-lg border-t-0' 
+            : 'rounded-lg'
+        }`}
+        style={{
+          boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)'
+        }}
+        data-account-id={account["@CreditLiabilityID"] || account["@_AccountNumber"] || account["@_AccountIdentifier"] || account["@_SubscriberCode"] || "unknown"}
+      >
+        <CardContent className="p-2">
+          <div 
+            className="flex items-center justify-between cursor-pointer hover:bg-green-100 -m-2 p-3 rounded-lg transition-colors"
+            onClick={() => setIsCollapsed(false)}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">
+                  {isPublicRecord() ? (
+                    account.publicRecordType || account["@_AccountType"] || "Public Record"
+                  ) : (
+                    account._CREDITOR?.["@_Name"] || account.CREDIT_BUSINESS?.["@_Name"] || "Unknown Creditor"
+                  )}
+                </h3>
+                <p className="text-sm text-green-600 font-medium">
+                  {(() => {
+                    const accountId = account["@CreditLiabilityID"] || account["@_AccountNumber"] || account["@_AccountIdentifier"] || account["@_SubscriberCode"] || "unknown";
+                    const savedDisputeData = savedDisputes[accountId];
+                    if (savedDisputeData && typeof savedDisputeData === 'object') {
+                      return `Dispute: ${savedDisputeData.reason}`;
+                    }
+                    return "Dispute Saved";
+                  })()}
+                </p>
+              </div>
+            </div>
+            <ChevronDown className="w-4 h-4 text-blue-600" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card 
-      className={`transition-all duration-300 shadow-sm rounded-lg border hover:shadow-md ${
+      className={`transition-all duration-300 shadow-sm hover:shadow-md ${
+        isFirstInConnectedSection 
+          ? 'connected-first-account' 
+          : 'rounded-lg'
+      } border ${
         isDisputeSaved 
           ? 'border-green-200 bg-green-50/50' 
-          : hasAnyNegative 
-            ? 'border-red-200 bg-red-50' 
-            : 'border-gray-200 bg-white'
+          : (hasAnyNegative 
+              ? 'border-red-200 bg-red-50' 
+              : 'border-gray-200 bg-white')
       }`}
       style={{
-        boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)'
+        boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
+        ...(isFirstInConnectedSection && {
+          borderTopLeftRadius: '0',
+          borderTopRightRadius: '0',
+          borderBottomLeftRadius: '0.5rem',
+          borderBottomRightRadius: '0.5rem',
+          borderTop: 'none'
+        })
       }}
-      data-account-id={account["@CreditLiabilityID"] || account["@_AccountNumber"] || "unknown"}
+      data-account-id={account["@CreditLiabilityID"] || account["@_AccountNumber"] || account["@_AccountIdentifier"] || account["@_SubscriberCode"] || "unknown"}
       data-highlight-target={hasAnyNegative ? "true" : "false"}
     >
       <CardContent className={`px-6 ${hasAnyNegative ? 'pt-6 pb-6' : 'pt-1 pb-2'}`}>
@@ -845,6 +999,19 @@ Due to these reporting inaccuracies and regulatory violations, I am requesting t
               </button>
             )}
             {expandAll && <div className="w-8 h-8"></div>}
+          </div>
+        )}
+        
+        {/* Up arrow for saved accounts (including public records) when expanded */}
+        {isDisputeSaved && !isCollapsed && (
+          <div className="flex items-center justify-between mb-4 -mx-2">
+            <div></div>
+            <button
+              onClick={() => setIsCollapsed(true)}
+              className="flex items-center justify-center w-8 h-8 text-blue-600 hover:text-blue-800 transition-colors"
+            >
+              <ChevronUp className="w-4 h-4" />
+            </button>
           </div>
         )}
         
@@ -1775,11 +1942,26 @@ Due to these reporting inaccuracies and regulatory violations, I am requesting t
           </div>
         )}
 
+        {/* Light grey divider below More Details toggle for negative accounts */}
+        {hasAnyNegative && (
+          <div className="border-t border-gray-200 mt-2 mb-3"></div>
+        )}
+
+        {/* Divider before violations section */}
+        {aiViolations.length > 0 && (
+          <div className="border-t border-gray-300 mb-2 mt-3" id={`grey-divider-${accountUniqueId}`}></div>
+        )}
+
         {/* AI Violations Alert (if any) */}
         {aiViolations.length > 0 && (
-          <div style={{ marginTop: '-8px' }}>
+          <div style={{ marginTop: '-6px' }}>
             <button
-              onClick={() => setShowViolations(!showViolations)}
+              onClick={() => {
+                setShowViolations(!showViolations);
+                if (!showViolations) {
+                  setShowGuidedHelp(false); // Close dispute suggestions when opening violations
+                }
+              }}
               className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 p-2 rounded-md transition-colors font-medium"
             >
               <Zap className="w-4 h-4 text-blue-600" />
@@ -1821,7 +2003,7 @@ Due to these reporting inaccuracies and regulatory violations, I am requesting t
             
             {/* Expanded Violations List */}
             {showViolations && (
-              <div className="-mt-2 space-y-2 bg-blue-50 border border-blue-600 rounded-lg p-3" style={{ marginTop: '-8px' }}>
+              <div className="-mt-2 space-y-2 bg-blue-50 border border-blue-600 rounded-lg p-3" style={{ marginTop: '-6px' }}>
                 <div className="mb-3 flex items-center justify-between">
                   <button
                     onClick={() => setShowViolations(!showViolations)}
@@ -1829,18 +2011,20 @@ Due to these reporting inaccuracies and regulatory violations, I am requesting t
                   >
                     <h4 className="text-sm font-medium text-gray-900">Detected Violations</h4>
                   </button>
-                  <Button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      addAllViolations(e);
-                    }}
-                    variant="outline"
-                    size="sm"
-                    className="h-7 px-3 text-xs font-black bg-blue-600 text-white hover:bg-blue-700 hover:text-white border-blue-600 hover:border-blue-700"
-                  >
-                    <Plus className="w-3 h-3 mr-1" />
-                    Use All {aiViolations.length}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        addAllViolations(e);
+                      }}
+                      variant="outline"
+                      size="sm"
+                      className="px-3 py-2 text-sm font-black bg-blue-600 text-white hover:bg-blue-700 hover:text-white border-blue-600 hover:border-blue-700"
+                    >
+                      <Zap className="w-3 h-3 mr-1" />
+                      Use All {aiViolations.length}
+                    </Button>
+                  </div>
                 </div>
                 <div className="mt-4 space-y-2">
                   {aiViolations.map((violation, index) => (
@@ -1849,11 +2033,11 @@ Due to these reporting inaccuracies and regulatory violations, I am requesting t
                     <div className="hidden md:flex items-center justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${
+                          <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-xs font-medium ${
                             violation.includes('Metro 2') 
-                              ? 'border-transparent text-white' 
-                              : 'border-transparent bg-red-600 text-white'
-                          }`} style={violation.includes('Metro 2') ? { backgroundColor: '#2563eb' } : {}}>
+                              ? 'bg-blue-200 text-blue-800 border border-blue-300' 
+                              : 'bg-red-200 text-red-800 border border-red-300'
+                          }`} style={{ fontSize: '10px' }}>
                             {violation.includes('Metro 2') ? 'Metro 2' : 'FCRA'}
                           </span>
                           <span className="text-sm font-medium">{violation}</span>
@@ -1872,7 +2056,7 @@ Due to these reporting inaccuracies and regulatory violations, I am requesting t
                             addViolationToDispute(violation);
                           }
                         }}
-                        className={selectedViolations.includes(violation) ? 'bg-blue-50 border-blue-300' : ''}
+                        className={selectedViolations.includes(violation) ? 'bg-blue-50 border-blue-300' : 'border-gray-300'}
                       >
                         {selectedViolations.includes(violation) ? 'Added' : 'Add to Dispute'}
                       </Button>
@@ -1881,11 +2065,11 @@ Due to these reporting inaccuracies and regulatory violations, I am requesting t
                     {/* Mobile Layout */}
                     <div className="md:hidden">
                       <div className="flex items-center gap-2 mb-2">
-                        <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap flex-shrink-0 ${
+                        <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-xs font-medium whitespace-nowrap flex-shrink-0 ${
                           violation.includes('Metro 2') 
-                            ? 'border-transparent text-white' 
-                            : 'border-transparent bg-red-600 text-white'
-                        }`} style={violation.includes('Metro 2') ? { backgroundColor: '#2563eb' } : {}}>
+                            ? 'bg-blue-200 text-blue-800 border border-blue-300' 
+                            : 'bg-red-200 text-red-800 border border-red-300'
+                        }`} style={{ fontSize: '10px' }}>
                           {violation.includes('Metro 2') ? 'M-2' : 'FCRA'}
                         </span>
                         <span className="text-sm font-medium">{violation}</span>
@@ -1918,10 +2102,15 @@ Due to these reporting inaccuracies and regulatory violations, I am requesting t
 
         {/* Guided Help Section - Optional suggestions */}
         {hasAnyNegative && aiViolations.length > 0 && aiScanCompleted && (
-          <div className="mb-4" style={{ marginTop: '-4px' }}>
+          <div className="mb-4" style={{ marginTop: '-2px' }}>
             <button
-              onClick={() => setShowGuidedHelp(!showGuidedHelp)}
-              className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 p-2 rounded-md transition-colors font-medium"
+              onClick={() => {
+                setShowGuidedHelp(!showGuidedHelp);
+                if (!showGuidedHelp) {
+                  setShowViolations(false); // Close violations when opening dispute suggestions
+                }
+              }}
+              className="flex items-center gap-2 text-sm text-blue-600 hover:text-white hover:bg-blue-700 p-2 rounded-md transition-colors font-medium"
             >
               <Lightbulb className="w-4 h-4 text-blue-600" />
               <span>View AI Dispute Suggestions</span>
@@ -1933,13 +2122,22 @@ Due to these reporting inaccuracies and regulatory violations, I am requesting t
 
             {/* Expanded Guided Help - Simplified 3 combinations */}
             {showGuidedHelp && (
-              <div className="mt-3 space-y-2 bg-blue-50 border border-blue-600 rounded-lg p-3">
-                <button
-                  onClick={() => setShowGuidedHelp(!showGuidedHelp)}
-                  className="mb-3 w-full flex items-center justify-between text-left hover:bg-blue-100 rounded-md p-2 transition-colors"
-                >
-                  <h4 className="text-sm font-medium text-gray-900">AI Dispute Suggestions</h4>
-                </button>
+              <div className="space-y-2 bg-blue-50 border border-blue-600 rounded-lg p-3" style={{ marginTop: '-2px' }}>
+                <div className="mb-3 flex items-center justify-between">
+                  <button
+                    onClick={() => setShowGuidedHelp(!showGuidedHelp)}
+                    className="flex-1 text-left hover:bg-blue-100 rounded-md p-2 transition-colors mr-2"
+                  >
+                    <h4 className="text-sm font-medium text-gray-900">AI Dispute Suggestions</h4>
+                  </button>
+                  <button
+                    onClick={() => setShowGuidedHelp(false)}
+                    className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded transition-colors"
+                    aria-label="Close suggestions"
+                  >
+                    <ChevronUp className="w-4 h-4" />
+                  </button>
+                </div>
                 
                 <div className="space-y-2">
                   {getBestPracticeCombinations().map((combination, index) => (
@@ -1948,7 +2146,7 @@ Due to these reporting inaccuracies and regulatory violations, I am requesting t
                       <div className="hidden md:flex items-center justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold border-transparent text-white" style={{ backgroundColor: '#2563eb' }}>
+                            <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-600 border border-blue-200" style={{ fontSize: '10px' }}>
                               AI Suggestion
                             </span>
                             <span className="text-sm font-medium">{combination.title}</span>
@@ -1965,7 +2163,7 @@ Due to these reporting inaccuracies and regulatory violations, I am requesting t
                             e.stopPropagation();
                             applyBestPracticeCombination(combination, index, e);
                           }}
-                          className={selectedSuggestionIndex === index ? 'bg-blue-50 border-blue-300' : ''}
+                          className={selectedSuggestionIndex === index ? 'bg-blue-50 border-blue-300' : 'border-gray-300'}
                         >
                           {selectedSuggestionIndex === index ? 'Added' : 'Add to Dispute'}
                         </Button>
@@ -1974,7 +2172,7 @@ Due to these reporting inaccuracies and regulatory violations, I am requesting t
                       {/* Mobile Layout */}
                       <div className="md:hidden">
                         <div className="flex items-center gap-2 mb-2">
-                          <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap flex-shrink-0 border-transparent text-white" style={{ backgroundColor: '#2563eb' }}>
+                          <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-xs font-medium whitespace-nowrap flex-shrink-0 bg-blue-200 text-blue-800 border border-blue-300" style={{ fontSize: '10px' }}>
                             AI Suggestion
                           </span>
                           <span className="text-sm font-medium">{combination.title}</span>
@@ -2037,12 +2235,6 @@ Due to these reporting inaccuracies and regulatory violations, I am requesting t
               </span>
             </div>
 
-
-
-
-
-
-
             <div className="space-y-4">
 
               {/* Reason Selection */}
@@ -2080,7 +2272,7 @@ Due to these reporting inaccuracies and regulatory violations, I am requesting t
                             setTimeout(() => checkFormCompletionAndShowArrow(value), 300);
                           }
                         }}
-                        className="w-full border border-gray-300 bg-white h-[40px] px-3 text-sm rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full border border-gray-300 bg-white h-[40px] px-3 text-sm rounded-md focus:outline-none focus:border-gray-400 dispute-reason-field"
                       >
                         <option value="">Select dispute reason...</option>
                         {disputeReasons.slice(1, -1).map((reason) => (
@@ -2117,7 +2309,7 @@ Due to these reporting inaccuracies and regulatory violations, I am requesting t
                             }
                           }}
                           placeholder={isTypingReason ? "AI is writing your dispute reason..." : "Enter your dispute reason..."}
-                          className="w-full border border-gray-300 bg-white rounded-md p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                          className="w-full border border-gray-300 bg-white rounded-md p-3 text-sm focus:outline-none focus:border-gray-400 resize-none mobile-resizable dispute-reason-field"
                           readOnly={isTypingReason}
                           rows={Math.max(1, Math.ceil((customReason || "").length / 80))}
                           style={{ 
@@ -2125,7 +2317,7 @@ Due to these reporting inaccuracies and regulatory violations, I am requesting t
                             height: 'auto'
                           }}
                         />
-                        {customReason.trim() && !isTypingReason && !hasAiGeneratedText && !customReason.includes('Metro 2') && !customReason.includes('FCRA') && (
+                        {false && customReason.trim() && !isTypingReason && (
                           <div className="mt-2 flex justify-end">
                             <button
                               onClick={() => {
@@ -2186,7 +2378,7 @@ Due to these reporting inaccuracies and regulatory violations, I am requesting t
                             setTimeout(() => checkFormCompletionAndShowArrow(undefined, value), 300);
                           }
                         }}
-                        className="w-full border border-gray-300 bg-white h-[40px] px-3 text-sm rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full border border-gray-300 bg-white h-[40px] px-3 text-sm rounded-md focus:outline-none focus:border-gray-400 dispute-instruction-field"
                       >
                         <option value="">Select dispute instruction...</option>
                         {disputeInstructions.slice(1, -1).map((instruction) => (
@@ -2221,14 +2413,14 @@ Due to these reporting inaccuracies and regulatory violations, I am requesting t
                             }
                           }}
                           placeholder={isTypingInstruction ? "AI is writing your dispute instruction..." : "Enter your dispute instruction..."}
-                          className="w-full border border-gray-300 bg-white rounded-md p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                          className="w-full border border-gray-300 bg-white rounded-md p-3 text-sm focus:outline-none focus:border-gray-400 resize-none mobile-resizable dispute-instruction-field"
                           readOnly={isTypingInstruction}
                           rows={2}
                           style={{ 
                             minHeight: '60px'
                           }}
                         />
-                        {customInstruction.trim() && !isTypingInstruction && !hasAiGeneratedText && !customInstruction.includes('Metro 2') && !customInstruction.includes('FCRA') && (
+                        {false && customInstruction.trim() && !isTypingInstruction && (
                           <div className="mt-2 flex justify-end">
                             <button
                               onClick={() => {
@@ -2278,76 +2470,135 @@ Due to these reporting inaccuracies and regulatory violations, I am requesting t
                       </div>
                     </div>
                   )}
-                  <span className="inline-flex items-center justify-center w-6 h-6 md:w-5 md:h-5 bg-blue-600 text-white text-sm font-black rounded-full mr-1 flex-shrink-0">3</span>
+                  <span className={`inline-flex items-center justify-center w-6 h-6 md:w-5 md:h-5 text-white text-sm font-black rounded-full mr-1 flex-shrink-0 transition-colors duration-300 ${
+                    isDisputeSaved ? 'bg-green-600' : 'bg-blue-600'
+                  }`}>3</span>
                   <Button 
+                    disabled={(() => {
+                      const hasReason = (selectedViolations.length > 0 || showCustomReasonField) ? customReason.trim() : selectedReason;
+                      const hasInstruction = (selectedViolations.length > 0 || showCustomInstructionField) ? customInstruction.trim() : selectedInstruction;
+                      return !hasReason || !hasInstruction;
+                    })()}
                     onClick={() => {
-                      // Check if required fields are filled
-                    const hasReason = (selectedViolations.length > 0 || showCustomReasonField) ? customReason.trim() : selectedReason;
-                    const hasInstruction = (selectedViolations.length > 0 || showCustomInstructionField) ? customInstruction.trim() : selectedInstruction;
-                    
-                    if (!hasReason || !hasInstruction) {
-                      toast({
-                        title: "Missing Information",
-                        description: "Please fill in both the reason and instruction fields before continuing.",
-                        variant: "destructive",
-                      });
-                      return;
-                    }
-                    
-                    // Save the dispute data
-                    console.log("Saving dispute:", { 
-                      reason: (selectedViolations.length > 0 || showCustomReasonField) ? customReason : selectedReason, 
-                      instruction: (selectedViolations.length > 0 || showCustomInstructionField) ? customInstruction : selectedInstruction, 
-                      violations: selectedViolations 
-                    });
-                    
-                    // Set dispute as saved
-                    setIsDisputeSaved(true);
-                    
-                    // Notify parent component that this account's dispute was saved
-                    if (onDisputeSaved) {
-                      const accountId = account["@CreditLiabilityID"] || account["@_AccountNumber"] || account["@_SubscriberCode"] || "unknown";
-                      console.log("Dispute saved for account ID:", accountId);
-                      onDisputeSaved(accountId);
-                    }
-                    
-                    // Find next negative account and scroll to it
-                    setTimeout(() => {
-                      const currentCard = document.querySelector(`[data-account-id="${account["@CreditLiabilityID"] || account["@_AccountNumber"] || "current"}"]`);
-                      if (currentCard) {
-                        // Find all account cards
-                        const allCards = document.querySelectorAll('[data-account-id]');
-                        const currentIndex = Array.from(allCards).indexOf(currentCard);
+                      // If already saved, still trigger choreography but maintain saved state
+                      if (isDisputeSaved) {
+                        console.log('SAVE CLICKED - Already saved account dispute, triggering choreography');
+                        // Maintain saved state and trigger collapse
+                        setIsCollapsed(true);
                         
-                        // Look for next negative account (with red background)
-                        for (let i = currentIndex + 1; i < allCards.length; i++) {
-                          const card = allCards[i] as HTMLElement;
-                          if (card.querySelector('.bg-red-50')) {
-                            card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                            return;
-                          }
+                        // Notify parent component for any additional choreography
+                        if (onDisputeSaved) {
+                          const accountId = account["@CreditLiabilityID"] || account["@_AccountNumber"] || account["@_AccountIdentifier"] || account["@_SubscriberCode"] || "unknown";
+                          // Get current saved dispute data and pass it to maintain text
+                          const currentReason = (selectedViolations.length > 0 || showCustomReasonField) ? customReason.trim() : selectedReason.trim();
+                          const currentInstruction = (selectedViolations.length > 0 || showCustomInstructionField) ? customInstruction.trim() : selectedInstruction.trim();
+                          onDisputeSaved(accountId, {
+                            reason: currentReason,
+                            instruction: currentInstruction,
+                            violations: selectedViolations
+                          });
+                        }
+                        return;
+                      }
+                      
+                      console.log('SAVE CLICKED - Checking typing state:', { isTypingReason, isTypingInstruction });
+                      
+                      // If typing is in progress, complete it immediately before saving
+                      if (isTypingReason || isTypingInstruction) {
+                        console.log('SAVE CLICKED - Typing in progress, completing immediately');
+                        
+                        // Complete any ongoing typing animations immediately
+                        if (isTypingReason) {
+                          setIsTypingReason(false);
+                          // The auto-typing should have the complete reason in customReason
                         }
                         
-                        // If no more negative accounts, show completion message
-                        toast({
-                          title: "All Complete!",
-                          description: "All negative accounts have been processed!",
-                          className: "bg-blue-50 border-blue-200 text-blue-800",
-                        });
+                        if (isTypingInstruction) {
+                          setIsTypingInstruction(false);
+                          // The auto-typing should have the complete instruction in customInstruction
+                        }
+                        
+                        // Wait a brief moment for state to update before proceeding
+                        setTimeout(() => {
+                          proceedWithAccountSave();
+                        }, 50);
+                        return;
                       }
-                    }, 500);
-                  }}
-                  disabled={
-                    selectedViolations.length > 0 
-                      ? !customReason.trim() || !customInstruction.trim()
-                      : (showCustomReasonField ? !customReason.trim() : !selectedReason) || 
-                        (showCustomInstructionField ? !customInstruction.trim() : !selectedInstruction)
-                  }
+                      
+                      proceedWithAccountSave();
+                      
+                      function proceedWithAccountSave() {
+                        // Force complete text values when auto-typing was used
+                        let finalReason = (selectedViolations.length > 0 || showCustomReasonField) ? customReason.trim() : selectedReason.trim();
+                        let finalInstruction = (selectedViolations.length > 0 || showCustomInstructionField) ? customInstruction.trim() : selectedInstruction.trim();
+                        
+                        console.log('SAVE DEBUG - Final reason text:', finalReason);
+                        console.log('SAVE DEBUG - Final instruction text:', finalInstruction);
+                        console.log('SAVE DEBUG - Instruction length:', finalInstruction.length);
+                        
+                        if (!finalReason || !finalInstruction) {
+                          // Add red glow to incomplete fields
+                          if (!finalReason) {
+                            const reasonField = document.querySelector('.dispute-reason-field');
+                            if (reasonField) {
+                              reasonField.classList.add('ring-4', 'ring-red-400', 'ring-opacity-75');
+                              setTimeout(() => {
+                                reasonField.classList.remove('ring-4', 'ring-red-400', 'ring-opacity-75');
+                              }, 2000);
+                            }
+                          }
+                          
+                          if (!finalInstruction) {
+                            const instructionField = document.querySelector('.dispute-instruction-field');
+                            if (instructionField) {
+                              instructionField.classList.add('ring-4', 'ring-red-400', 'ring-opacity-75');
+                              setTimeout(() => {
+                                instructionField.classList.remove('ring-4', 'ring-red-400', 'ring-opacity-75');
+                              }, 2000);
+                            }
+                          }
+                          
+                          return;
+                        }
+                        
+                        // Set dispute as saved first to show green feedback
+                        setIsDisputeSaved(true);
+                        
+                        // Wait 700ms to show green feedback, then collapse
+                        setTimeout(() => {
+                          setIsCollapsed(true);
+                        }, 700);
+                      
+                        // Save the dispute data
+                        console.log("Saving dispute:", { 
+                          reason: finalReason, 
+                          instruction: finalInstruction, 
+                          violations: selectedViolations 
+                        });
+                        
+                        // Notify parent component that this account's dispute was saved
+                        if (onDisputeSaved) {
+                          const accountId = account["@CreditLiabilityID"] || account["@_AccountNumber"] || account["@_AccountIdentifier"] || account["@_SubscriberCode"] || "unknown";
+                          console.log("Dispute saved for account ID:", accountId);
+                          onDisputeSaved(accountId, {
+                            reason: finalReason,
+                            instruction: finalInstruction,
+                            violations: selectedViolations
+                          });
+                        }
+                      }
+                    }}
+
                   className={`!w-full !max-w-full !h-10 !px-4 !py-2 text-white rounded-md font-medium transition-colors duration-200 !opacity-100 !inline-flex !items-center !justify-center !box-border ${
                     isDisputeSaved 
                       ? "bg-green-600 hover:bg-green-700" 
-                      : "bg-blue-600 hover:bg-blue-700"
-                  } disabled:!bg-gray-400 disabled:cursor-not-allowed disabled:!opacity-100 disabled:!w-full disabled:!max-w-full`}
+                      : (() => {
+                          const hasReason = (selectedViolations.length > 0 || showCustomReasonField) ? customReason.trim() : selectedReason;
+                          const hasInstruction = (selectedViolations.length > 0 || showCustomInstructionField) ? customInstruction.trim() : selectedInstruction;
+                          const isIncomplete = !hasReason || !hasInstruction;
+                          return isIncomplete ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700";
+                        })()
+                  }`}
                 >
                   {isDisputeSaved ? (
                     <>
