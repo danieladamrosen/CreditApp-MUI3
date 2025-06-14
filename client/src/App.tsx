@@ -6,6 +6,7 @@ import CssBaseline from '@mui/material/CssBaseline';
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import CreditReportPage from "@/pages/credit-report";
+
 import NotFound from "@/pages/not-found";
 import { useEffect } from "react";
 
@@ -29,6 +30,7 @@ function Router() {
     <Switch>
       <Route path="/" component={CreditReportPage} />
       <Route path="/credit-report" component={CreditReportPage} />
+
       <Route component={NotFound} />
     </Switch>
   );
